@@ -14,3 +14,9 @@ authors = ["Alex Hua <huazifan@gmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+data-encoding = "2.3.3"
+ring = "0.16.20"
+
+[dev-dependencies]
+libauthenticator = "0.1.0"

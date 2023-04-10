@@ -1,10 +1,12 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::path::PathBuf;
 
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+use crate::error;
 use crate::HMACType;
 use crate::KeyType;
 
@@ -14,6 +16,8 @@ static URI_DATA_REGEX: Lazy<regex::Regex> =
 /// the URI struct
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct URI {
+    /// name
+    pub name: String,
     /// type
     pub key_type: KeyType,
     /// Secret
@@ -56,6 +60,70 @@ impl URI {
     pub fn new_from_uri(value: String) -> Self {
         URI::from(value)
     }
+
+    /// Create a new URI from a QR code
+    ///
+    /// ```rust
+    /// use libr2fa::URI;
+    /// use libr2fa::KeyType;
+    /// use libr2fa::HMACType;
+    ///
+    /// let uri = URI::from_qr_code("public/uri_qrcode_test.png");
+    /// assert!(uri.is_ok());
+    /// let uri = uri.unwrap();
+    ///
+    /// assert_eq!(uri.key_type, KeyType::TOTP);
+    /// assert_eq!(uri.issuer, Some("ACME Co".to_string()));
+    /// assert_eq!(uri.digits, 7);
+    /// assert_eq!(uri.counter, None);
+    /// assert_eq!(uri.algorithm, HMACType::SHA256);
+    /// assert_eq!(uri.secret, "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ".to_string());
+    /// ```
+    pub fn from_qr_code(path: &str) -> Result<Self, error::Error> {
+        // test if it is a valid path
+        let path = PathBuf::from(path);
+        if !path.exists() {
+            return Err(error::Error::InvalidPath(
+                "target path does not exists".to_string(),
+            ));
+        }
+        // if path is not a file
+        if path.is_dir() {
+            return Err(error::Error::InvalidPath(
+                "target path is not a file".to_string(),
+            ));
+        }
+
+        // read the file
+        let img = image::open(path);
+        if let Err(e) = img {
+            return Err(error::Error::InvalidPath(format!(
+                "could not read file: {}",
+                e
+            )));
+        }
+        let img = img.unwrap().to_luma8();
+
+        // check https://docs.rs/rqrr/latest/rqrr/
+        let mut img = rqrr::PreparedImage::prepare(img);
+        let grids = img.detect_grids();
+        if grids.is_empty() {
+            return Err(error::Error::InvalidPath(
+                "could not detect QR code".to_string(),
+            ));
+        }
+        let grid = &grids[0];
+        let decoded = grid.decode();
+        if let Err(e) = decoded {
+            return Err(error::Error::InvalidPath(format!(
+                "could not decode QR code: {}",
+                e
+            )));
+        }
+        let (_, decoded) = decoded.unwrap();
+
+        Ok(URI::from(decoded))
+    }
 }
 
 impl Display for URI {
@@ -73,7 +141,7 @@ impl Display for URI {
 ///     "otpauth://hotp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co&algorithm=SHA256&digits=7&counter=7".to_string()
 /// );
 ///
-/// assert_eq!(uri.to_string(), "otpauth://hotp?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&algorithm=SHA256&digits=7&counter=7&issuer=ACME+Co");
+/// assert_eq!(uri.to_string(), "otpauth://hotp/ACME+Co%3Ajohn.doe%40email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&algorithm=SHA256&digits=7&counter=7&issuer=ACME+Co");
 /// ```
 impl From<URI> for String {
     fn from(value: URI) -> Self {
@@ -81,6 +149,9 @@ impl From<URI> for String {
 
         uri.push_str("otpauth://");
         uri.push_str(value.key_type.to_string().as_str());
+        uri.push('/');
+        let name = url::form_urlencoded::byte_serialize(value.name.as_bytes()).collect::<String>();
+        uri.push_str(&name);
 
         let mut keys = vec![];
         let secret = format!("secret={}", value.secret);
@@ -126,8 +197,25 @@ impl From<&str> for URI {
 
         let key_type = value.replace("otpauth://", "");
         let key_type = key_type.split('/').collect::<Vec<&str>>();
+        if key_type.len() < 2 {
+            return uri;
+        }
+        let name = key_type[1];
         let key_type = key_type[0];
         uri.key_type = KeyType::from(key_type);
+
+        let name = if name.get(0..1) == Some("?") {
+            "".to_string()
+        } else {
+            let name = name.split('?').collect::<Vec<&str>>();
+            let name = name[0];
+            let name: String = url::form_urlencoded::parse(name.as_bytes())
+                .map(|(key, val)| [key, val].concat())
+                .collect();
+
+            name
+        };
+        uri.name = name;
 
         let caps = URI_DATA_REGEX.captures_iter(value);
 

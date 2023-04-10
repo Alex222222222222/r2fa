@@ -7,12 +7,9 @@
 /// use libr2fa::Key;
 ///
 /// let mut hotp_key = HOTPKey {
-///     name: "".to_string(),
 ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
-///     digits: 6,
-///     counter: 0,
-///     recovery_codes: Vec::default(),
 ///     hmac_type: HMACType::SHA1,
+///     ..Default::default()
 /// };
 ///
 /// let code = hotp_key.get_code().unwrap();
@@ -79,12 +76,9 @@ impl From<String> for KeyType {
 /// use libr2fa::Key;
 ///
 /// let mut hotp_key = HOTPKey {
-///     name: "".to_string(),
 ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
-///     digits: 6,
-///     counter: 0,
-///     recovery_codes: Vec::default(),
 ///     hmac_type: HMACType::SHA1,
+///     ..Default::default()
 /// };
 ///
 /// let code = hotp_key.get_code().unwrap();
@@ -103,12 +97,9 @@ pub trait Key {
     /// use libr2fa::Key;
     ///
     /// let mut hotp_key = HOTPKey {
-    ///     name: "".to_string(),
     ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
-    ///     digits: 6,
-    ///     counter: 0,
-    ///     recovery_codes: Vec::default(),
     ///     hmac_type: HMACType::SHA1,
+    ///     ..Default::default()
     /// };
     ///
     /// hotp_key.set_name("test");
@@ -125,12 +116,9 @@ pub trait Key {
     /// use libr2fa::Key;
     ///
     /// let mut hotp_key = HOTPKey {
-    ///     name: "".to_string(),
     ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
-    ///     digits: 6,
-    ///     counter: 0,
-    ///     recovery_codes: Vec::default(),
     ///     hmac_type: HMACType::SHA1,
+    ///     ..Default::default()
     /// };
     ///
     /// hotp_key.set_recovery_codes(&["test".to_string()]);
@@ -153,10 +141,8 @@ pub trait Key {
     /// let mut hotp_key = HOTPKey {
     ///     name: "".to_string(),
     ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
-    ///     digits: 6,
-    ///     counter: 0,
-    ///     recovery_codes: Vec::default(),
     ///     hmac_type: HMACType::SHA1,
+    ///     ..Default::default()
     /// };
     ///
     /// hotp_key.set_name("test");
@@ -173,12 +159,9 @@ pub trait Key {
     /// use libr2fa::Key;
     ///
     /// let mut hotp_key = HOTPKey {
-    ///     name: "".to_string(),
     ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
-    ///     digits: 6,
-    ///     counter: 0,
-    ///     recovery_codes: Vec::default(),
     ///     hmac_type: HMACType::SHA1,
+    ///     ..Default::default()
     /// };
     ///
     /// hotp_key.set_recovery_codes(&["test".to_string()]);
@@ -204,11 +187,12 @@ pub trait Key {
 /// let mut totp_key1 = totp_key1.unwrap();
 ///
 /// let mut totp_key2 = TOTPKey {
-///     name: "ACME Co".to_string(),
+///     name: "ACME Co:john.doe@email.com".to_string(),
 ///     key: "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ".to_string(),
 ///     digits: 7,
 ///     time_step: 60,
 ///     hmac_type: HMACType::SHA256,
+///     issuer: Some("ACME Co".to_string()),
 ///     ..Default::default()
 ///     };
 ///
@@ -225,6 +209,43 @@ pub fn otpauth_from_uri(uri: &str) -> Result<Box<dyn Key>, Error> {
     }
 }
 
+/// create a new key from the uri qrcode
+///
+/// ```rust
+/// use libr2fa::otpauth_from_uri_qrcode;
+/// use libr2fa::TOTPKey;
+/// use libr2fa::HMACType;
+/// use libr2fa::Key;
+///
+/// let totp_key1 = otpauth_from_uri_qrcode("public/uri_qrcode_test.png");
+/// if let Err(err) = totp_key1 {
+///     panic!("{}", err);
+/// }
+/// let mut totp_key1 = totp_key1.unwrap();
+///
+/// let mut totp_key2 = TOTPKey {
+///     name: "ACME Co:john.doe@email.com".to_string(),
+///     issuer: Some("ACME Co".to_string()),
+///     key: "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ".to_string(),
+///     digits: 7,
+///     time_step: 60,
+///     hmac_type: HMACType::SHA256,
+///     ..Default::default()
+/// };
+///
+/// assert_eq!(totp_key1.get_name(), totp_key2.get_name());
+/// assert_eq!(totp_key1.get_type(), totp_key2.get_type());
+/// assert_eq!(totp_key1.get_code(), totp_key2.get_code());
+/// ```
+pub fn otpauth_from_uri_qrcode(path: &str) -> Result<Box<dyn Key>, Error> {
+    let uri_struct = URI::from_qr_code(path)?;
+
+    match uri_struct.key_type {
+        KeyType::HOTP => HOTPKey::from_uri_struct(&uri_struct),
+        KeyType::TOTP => TOTPKey::from_uri_struct(&uri_struct),
+    }
+}
+
 pub trait OptAuthKey {
     /// to uri struct
     fn to_uri_struct(&self) -> URI;
@@ -233,6 +254,9 @@ pub trait OptAuthKey {
     fn get_uri(&self) -> String {
         self.to_uri_struct().to_string()
     }
+
+    /// get issuer
+    fn get_issuer(&self) -> Option<&str>;
 
     /// create the key from the uri struct
     fn from_uri_struct(uri: &URI) -> Result<Box<dyn Key>, Error>;

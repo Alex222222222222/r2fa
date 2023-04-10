@@ -39,6 +39,8 @@ pub struct TOTPKey {
     pub recovery_codes: Vec<String>,
     /// hmac type
     pub hmac_type: HMACType,
+    /// issuer
+    pub issuer: Option<String>,
 }
 
 impl Default for TOTPKey {
@@ -51,6 +53,7 @@ impl Default for TOTPKey {
             t0: 0,
             recovery_codes: Default::default(),
             hmac_type: Default::default(),
+            issuer: Default::default(),
         }
     }
 }
@@ -73,8 +76,9 @@ impl TOTPKey {
 impl OptAuthKey for TOTPKey {
     fn to_uri_struct(&self) -> crate::URI {
         crate::URI {
+            name: self.name.clone(),
+            issuer: self.issuer.clone(),
             secret: self.key.clone(),
-            issuer: Some(self.name.clone()),
             algorithm: self.hmac_type,
             digits: self.digits,
             period: Some(self.time_step),
@@ -84,12 +88,6 @@ impl OptAuthKey for TOTPKey {
     }
 
     fn from_uri_struct(uri: &crate::URI) -> Result<Box<dyn Key>, crate::Error> {
-        let name = if let Some(name) = uri.issuer.clone() {
-            name
-        } else {
-            "".to_string()
-        };
-
         let time_step = if let Some(time_step) = uri.period {
             time_step
         } else {
@@ -97,7 +95,8 @@ impl OptAuthKey for TOTPKey {
         };
 
         Ok(Box::from(TOTPKey {
-            name,
+            name: uri.name.clone(),
+            issuer: uri.issuer.clone(),
             key: uri.secret.clone(),
             digits: uri.digits,
             time_step,
@@ -105,6 +104,10 @@ impl OptAuthKey for TOTPKey {
             recovery_codes: Vec::default(),
             hmac_type: uri.algorithm,
         }))
+    }
+
+    fn get_issuer(&self) -> Option<&str> {
+        self.issuer.as_deref()
     }
 }
 

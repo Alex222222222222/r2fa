@@ -17,6 +17,8 @@ pub enum Error {
     ///
     /// with a description of the error
     InvalidURI(String),
+    /// invalid file path
+    InvalidPath(String),
 }
 
 impl std::fmt::Display for Error {
@@ -25,6 +27,7 @@ impl std::fmt::Display for Error {
             Error::InvalidKey => write!(f, "Invalid key"),
             Error::InvalidDigits => write!(f, "Invalid digits"),
             Error::InvalidURI(s) => write!(f, "Invalid URI: {}", s),
+            Error::InvalidPath(s) => write!(f, "Invalid path: {}", s),
         }
     }
 }

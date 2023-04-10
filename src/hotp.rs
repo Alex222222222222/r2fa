@@ -16,12 +16,9 @@ use crate::{error, HMACType, Key, OptAuthKey};
 /// use libr2fa::Key;
 ///
 /// let mut hotp_key = HOTPKey {
-///     name: "".to_string(),
 ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
-///     digits: 6,
-///     counter: 0,
-///     recovery_codes: Vec::default(),
 ///     hmac_type: HMACType::SHA1,
+///     ..Default::default()
 /// };
 ///
 /// let code = hotp_key.get_code().unwrap();
@@ -41,6 +38,8 @@ pub struct HOTPKey {
     pub recovery_codes: Vec<String>,
     /// hmac type
     pub hmac_type: HMACType,
+    /// issuer
+    pub issuer: Option<String>,
 }
 
 impl Default for HOTPKey {
@@ -52,6 +51,7 @@ impl Default for HOTPKey {
             counter: Default::default(),
             recovery_codes: Default::default(),
             hmac_type: Default::default(),
+            issuer: Default::default(),
         }
     }
 }
@@ -74,8 +74,9 @@ impl HOTPKey {
 impl OptAuthKey for HOTPKey {
     fn to_uri_struct(&self) -> crate::URI {
         crate::URI {
+            name: self.name.clone(),
             secret: self.key.clone(),
-            issuer: Some(self.name.clone()),
+            issuer: self.issuer.clone(),
             algorithm: self.hmac_type,
             digits: self.digits,
             period: None,
@@ -85,12 +86,6 @@ impl OptAuthKey for HOTPKey {
     }
 
     fn from_uri_struct(uri: &crate::URI) -> Result<Box<dyn Key>, crate::Error> {
-        let name = if let Some(name) = uri.issuer.clone() {
-            name
-        } else {
-            "".to_string()
-        };
-
         let counter = if let Some(counter) = uri.counter {
             counter
         } else {
@@ -98,13 +93,18 @@ impl OptAuthKey for HOTPKey {
         };
 
         Ok(Box::from(HOTPKey {
-            name,
+            name: uri.name.clone(),
             key: uri.secret.clone(),
             digits: uri.digits,
             counter,
             recovery_codes: Vec::default(),
             hmac_type: uri.algorithm,
+            issuer: uri.issuer.clone(),
         }))
+    }
+
+    fn get_issuer(&self) -> Option<&str> {
+        self.issuer.as_deref()
     }
 }
 

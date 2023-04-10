@@ -4,12 +4,10 @@ use crate::Key;
 #[test]
 fn hotp_sha1_work() {
     let mut hotp_key1 = HOTPKey {
-        name: "".to_string(),
         key: "MZZHI6LHOVUGU===".to_string(),
-        digits: 6,
         counter: 4,
-        recovery_codes: Vec::default(),
         hmac_type: crate::HMACType::SHA1,
+        ..Default::default()
     };
 
     let hotp_key2 =
@@ -23,12 +21,10 @@ fn hotp_sha1_work() {
 #[test]
 fn hotp_sha256_work() {
     let mut hotp_key1 = HOTPKey {
-        name: "".to_string(),
         key: "MZZHI6LHOVUGU===".to_string(),
-        digits: 6,
         counter: 4,
-        recovery_codes: Vec::default(),
         hmac_type: crate::HMACType::SHA256,
+        ..Default::default()
     };
 
     let hotp_key2 = libauthenticator::hotp(
@@ -46,12 +42,10 @@ fn hotp_sha256_work() {
 #[test]
 fn hotp_sha512_work() {
     let mut hotp_key1 = HOTPKey {
-        name: "".to_string(),
         key: "MZZHI6LHOVUGU===".to_string(),
-        digits: 6,
         counter: 4,
-        recovery_codes: Vec::default(),
         hmac_type: crate::HMACType::SHA512,
+        ..Default::default()
     };
 
     let hotp_key2 = libauthenticator::hotp(
@@ -165,7 +159,8 @@ fn uri_decoder_totp_work() {
     let mut totp_key1 = totp_key1.unwrap();
 
     let mut totp_key2 = crate::TOTPKey {
-        name: "ACME Co".to_string(),
+        name: "ACME Co:john.doe@email.com".to_string(),
+        issuer: Some("ACME Co".to_string()),
         key: "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ".to_string(),
         digits: 7,
         time_step: 60,
@@ -187,7 +182,8 @@ fn uri_decoder_hotp_work() {
     let mut hotp_key1 = hotp_key1.unwrap();
 
     let mut hotp_key2 = crate::HOTPKey {
-        name: "ACME Co".to_string(),
+        name: "ACME Co:john.doe@email.com".to_string(),
+        issuer: Some("ACME Co".to_string()),
         key: "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ".to_string(),
         digits: 7,
         counter: 7,
@@ -198,4 +194,27 @@ fn uri_decoder_hotp_work() {
     assert_eq!(hotp_key1.get_name(), hotp_key2.get_name());
     assert_eq!(hotp_key1.get_type(), hotp_key2.get_type());
     assert_eq!(hotp_key1.get_code(), hotp_key2.get_code());
+}
+
+#[test]
+fn uri_qrcode_decoder_totp_work() {
+    let totp_key1 = crate::otpauth_from_uri_qrcode("public/uri_qrcode_test.png");
+    if let Err(err) = totp_key1 {
+        panic!("{}", err);
+    }
+    let mut totp_key1 = totp_key1.unwrap();
+
+    let mut totp_key2 = crate::TOTPKey {
+        name: "ACME Co:john.doe@email.com".to_string(),
+        issuer: Some("ACME Co".to_string()),
+        key: "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ".to_string(),
+        digits: 7,
+        time_step: 60,
+        hmac_type: crate::HMACType::SHA256,
+        ..Default::default()
+    };
+
+    assert_eq!(totp_key1.get_name(), totp_key2.get_name());
+    assert_eq!(totp_key1.get_type(), totp_key2.get_type());
+    assert_eq!(totp_key1.get_code(), totp_key2.get_code());
 }

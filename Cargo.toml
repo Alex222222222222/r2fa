@@ -1,0 +1,16 @@
+[package]
+name = "libr2fa"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "rust implementation for HTOP, TOTP and steam guard tow-factor-authentication"
+readme = "README.md"
+repository = "https://github.com/Alex222222222222/r2fa"
+homepage = "https://github.com/Alex222222222222/r2fa"
+keywords = ["2fa", "HTOP", "TOTP", "steamguard", "OTP", "Authentication"]
+categories = ["authentication"]
+authors = ["Alex Hua <huazifan@gmail.com>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]

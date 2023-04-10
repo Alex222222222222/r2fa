@@ -1,6 +1,6 @@
 /// Error type for the library
 #[derive(Debug, PartialEq)]
-pub enum Error{
+pub enum Error {
     /// Invalid key
     ///
     /// if the key type is totp or hotp the the key should be base32 encoded

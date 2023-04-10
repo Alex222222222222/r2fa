@@ -74,7 +74,7 @@ impl HMACType {
             HMACType::SHA512 => ring::hmac::HMAC_SHA512,
         }
     }
-    
+
     /// get_hash returns the hash of the key and the string
     fn get_hash(&self, key: &[u8], s: &[u8]) -> Result<Rc<[u8]>, error::Error> {
         let algorithm = self.get_algorithm();

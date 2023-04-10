@@ -17,17 +17,19 @@
 ///
 /// let code = hotp_key.get_code().unwrap();
 /// ```
-use std::{fmt::Display, rc::Rc};
-
 use serde::{Deserialize, Serialize};
 
-pub mod error;
-pub mod hotp;
-pub mod totp;
+mod error;
+mod hmac_type;
+mod hotp;
+mod totp;
+mod uri;
 
 pub use error::Error;
+pub use hmac_type::HMACType;
 pub use hotp::HOTPKey;
 pub use totp::TOTPKey;
+pub use uri::URI;
 
 #[cfg(test)]
 mod test;
@@ -36,55 +38,35 @@ mod test;
 /// HOTP is the counter based key
 /// TOTP is the time based key
 /// STEAM is the steam guard key (TODO not implemented yet)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum KeyType {
     HOTP,
+    #[default]
     TOTP,
 }
 
-/// HMACType is the type of the HMAC
-/// SHA1 is the default
-/// SHA256 is the recommended
-/// SHA512 is the most secure
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-pub enum HMACType {
-    #[default]
-    SHA1,
-    SHA256,
-    SHA512,
-}
-
-impl Display for HMACType {
+impl std::fmt::Display for KeyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.get_digest_name())
+        match self {
+            KeyType::HOTP => write!(f, "hotp"),
+            KeyType::TOTP => write!(f, "totp"),
+        }
     }
 }
 
-impl HMACType {
-    fn get_digest_name(&self) -> &'static str {
-        match self {
-            HMACType::SHA1 => "sha1",
-            HMACType::SHA256 => "sha256",
-            HMACType::SHA512 => "sha512",
+impl From<&str> for KeyType {
+    fn from(s: &str) -> Self {
+        match s.to_ascii_lowercase().as_str() {
+            "hotp" => KeyType::HOTP,
+            "totp" => KeyType::TOTP,
+            _ => KeyType::default(),
         }
     }
+}
 
-    fn get_algorithm(&self) -> ring::hmac::Algorithm {
-        match self {
-            HMACType::SHA1 => ring::hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY,
-            HMACType::SHA256 => ring::hmac::HMAC_SHA256,
-            HMACType::SHA512 => ring::hmac::HMAC_SHA512,
-        }
-    }
-
-    /// get_hash returns the hash of the key and the string
-    fn get_hash(&self, key: &[u8], s: &[u8]) -> Result<Rc<[u8]>, error::Error> {
-        let algorithm = self.get_algorithm();
-        let signer = ring::hmac::Key::new(algorithm, key);
-        let hmac = ring::hmac::sign(&signer, s);
-        let block = hmac.as_ref();
-
-        Ok(Rc::from(block))
+impl From<String> for KeyType {
+    fn from(s: String) -> Self {
+        KeyType::from(s.as_str())
     }
 }
 
@@ -205,4 +187,53 @@ pub trait Key {
     ///
     /// ```
     fn set_recovery_codes(&mut self, recovery_codes: &[String]);
+}
+
+/// create a new key from the uri string
+///
+/// ```rust
+/// use libr2fa::otpauth_from_uri;
+/// use libr2fa::TOTPKey;
+/// use libr2fa::HMACType;
+/// use libr2fa::Key;
+///
+/// let totp_key1 = otpauth_from_uri("otpauth://totp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co&algorithm=SHA256&digits=7&period=60");
+/// if let Err(err) = totp_key1 {
+///     panic!("{}", err);
+/// }
+/// let mut totp_key1 = totp_key1.unwrap();
+///
+/// let mut totp_key2 = TOTPKey {
+///     name: "ACME Co".to_string(),
+///     key: "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ".to_string(),
+///     digits: 7,
+///     time_step: 60,
+///     hmac_type: HMACType::SHA256,
+///     ..Default::default()
+///     };
+///
+/// assert_eq!(totp_key1.get_name(), totp_key2.get_name());
+/// assert_eq!(totp_key1.get_type(), totp_key2.get_type());
+/// assert_eq!(totp_key1.get_code(), totp_key2.get_code());
+/// ```
+pub fn otpauth_from_uri(uri: &str) -> Result<Box<dyn Key>, Error> {
+    let uri_struct = URI::from(uri);
+
+    match uri_struct.key_type {
+        KeyType::HOTP => HOTPKey::from_uri_struct(&uri_struct),
+        KeyType::TOTP => TOTPKey::from_uri_struct(&uri_struct),
+    }
+}
+
+pub trait OptAuthKey {
+    /// to uri struct
+    fn to_uri_struct(&self) -> URI;
+
+    /// get the uri for the key
+    fn get_uri(&self) -> String {
+        self.to_uri_struct().to_string()
+    }
+
+    /// create the key from the uri struct
+    fn from_uri_struct(uri: &URI) -> Result<Box<dyn Key>, Error>;
 }

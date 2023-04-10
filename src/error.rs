@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Error type for the library
-#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Error {
     /// Invalid key
     ///
@@ -13,6 +13,10 @@ pub enum Error {
     ///
     /// if the digits is not 5 for steam
     InvalidDigits,
+    /// invalid uri string
+    ///
+    /// with a description of the error
+    InvalidURI(String),
 }
 
 impl std::fmt::Display for Error {
@@ -20,6 +24,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::InvalidKey => write!(f, "Invalid key"),
             Error::InvalidDigits => write!(f, "Invalid digits"),
+            Error::InvalidURI(s) => write!(f, "Invalid URI: {}", s),
         }
     }
 }

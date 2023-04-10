@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{error, HMACType, Key};
+use crate::{error, HMACType, Key, OptAuthKey};
 
 /// TOTPKey is the key for the TOTP,
 /// TOTP is the time based key,
@@ -67,6 +67,44 @@ impl TOTPKey {
 
     fn get_key(&self) -> &str {
         &self.key
+    }
+}
+
+impl OptAuthKey for TOTPKey {
+    fn to_uri_struct(&self) -> crate::URI {
+        crate::URI {
+            secret: self.key.clone(),
+            issuer: Some(self.name.clone()),
+            algorithm: self.hmac_type,
+            digits: self.digits,
+            period: Some(self.time_step),
+            counter: None,
+            key_type: crate::KeyType::TOTP,
+        }
+    }
+
+    fn from_uri_struct(uri: &crate::URI) -> Result<Box<dyn Key>, crate::Error> {
+        let name = if let Some(name) = uri.issuer.clone() {
+            name
+        } else {
+            "".to_string()
+        };
+
+        let time_step = if let Some(time_step) = uri.period {
+            time_step
+        } else {
+            30
+        };
+
+        Ok(Box::from(TOTPKey {
+            name,
+            key: uri.secret.clone(),
+            digits: uri.digits,
+            time_step,
+            t0: 0,
+            recovery_codes: Vec::default(),
+            hmac_type: uri.algorithm,
+        }))
     }
 }
 

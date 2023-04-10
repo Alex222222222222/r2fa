@@ -115,4 +115,12 @@ impl Key for HOTPKey {
 
         Ok(code)
     }
+
+    fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+
+    fn set_recovery_codes(&mut self, recovery_codes: &[String]) {
+        self.recovery_codes = recovery_codes.to_vec();
+    }
 }

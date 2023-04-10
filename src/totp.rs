@@ -108,4 +108,12 @@ impl Key for TOTPKey {
     fn get_type(&self) -> crate::KeyType {
         crate::KeyType::TOTP
     }
+
+    fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+
+    fn set_recovery_codes(&mut self, recovery_codes: &[String]) {
+        self.recovery_codes = recovery_codes.to_vec();
+    }
 }

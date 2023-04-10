@@ -114,11 +114,95 @@ pub trait Key {
     fn get_code(&mut self) -> Result<String, error::Error>;
 
     /// get the name of the key
+    ///
+    /// ```rust
+    /// use libr2fa::HOTPKey;
+    /// use libr2fa::HMACType;
+    /// use libr2fa::Key;
+    ///
+    /// let mut hotp_key = HOTPKey {
+    ///     name: "".to_string(),
+    ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
+    ///     digits: 6,
+    ///     counter: 0,
+    ///     recovery_codes: Vec::default(),
+    ///     hmac_type: HMACType::SHA1,
+    /// };
+    ///
+    /// hotp_key.set_name("test");
+    ///
+    /// assert_eq!(hotp_key.get_name(), "test")
+    /// ```
     fn get_name(&self) -> &str;
 
     /// get the recovery codes
+    ///
+    /// ```rust
+    /// use libr2fa::HOTPKey;
+    /// use libr2fa::HMACType;
+    /// use libr2fa::Key;
+    ///
+    /// let mut hotp_key = HOTPKey {
+    ///     name: "".to_string(),
+    ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
+    ///     digits: 6,
+    ///     counter: 0,
+    ///     recovery_codes: Vec::default(),
+    ///     hmac_type: HMACType::SHA1,
+    /// };
+    ///
+    /// hotp_key.set_recovery_codes(&["test".to_string()]);
+    ///
+    /// assert_eq!(hotp_key.get_recovery_codes(), &["test".to_string()])
+    ///
+    /// ```
     fn get_recovery_codes(&self) -> &[String];
 
     /// get the type of the key
     fn get_type(&self) -> KeyType;
+
+    /// set the name of the key
+    ///
+    /// ```rust
+    /// use libr2fa::HOTPKey;
+    /// use libr2fa::HMACType;
+    /// use libr2fa::Key;
+    ///
+    /// let mut hotp_key = HOTPKey {
+    ///     name: "".to_string(),
+    ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
+    ///     digits: 6,
+    ///     counter: 0,
+    ///     recovery_codes: Vec::default(),
+    ///     hmac_type: HMACType::SHA1,
+    /// };
+    ///
+    /// hotp_key.set_name("test");
+    ///
+    /// assert_eq!(hotp_key.get_name(), "test")
+    /// ```
+    fn set_name(&mut self, name: &str);
+
+    /// set the recovery codes
+    ///
+    /// ```rust
+    /// use libr2fa::HOTPKey;
+    /// use libr2fa::HMACType;
+    /// use libr2fa::Key;
+    ///
+    /// let mut hotp_key = HOTPKey {
+    ///     name: "".to_string(),
+    ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
+    ///     digits: 6,
+    ///     counter: 0,
+    ///     recovery_codes: Vec::default(),
+    ///     hmac_type: HMACType::SHA1,
+    /// };
+    ///
+    /// hotp_key.set_recovery_codes(&["test".to_string()]);
+    ///
+    /// assert_eq!(hotp_key.get_recovery_codes(), &["test".to_string()])
+    ///
+    /// ```
+    fn set_recovery_codes(&mut self, recovery_codes: &[String]);
 }

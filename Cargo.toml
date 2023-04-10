@@ -7,6 +7,7 @@ description = "rust implementation for HTOP, TOTP and steam guard tow-factor-aut
 readme = "README.md"
 repository = "https://github.com/Alex222222222222/r2fa"
 homepage = "https://github.com/Alex222222222222/r2fa"
+documentation = "https://docs.rs/libr2fa/"
 keywords = ["2fa", "HTOP", "TOTP", "steamguard", "Authentication"]
 categories = ["authentication"]
 authors = ["Alex Hua <huazifan@gmail.com>"]

@@ -17,6 +17,8 @@ authors = ["Alex Hua <huazifan@gmail.com>"]
 serde = { version = "1.0", features = ["derive"] }
 data-encoding = "2.3.3"
 ring = "0.16.20"
+chrono = "0.4.24"
 
 [dev-dependencies]
 libauthenticator = "0.1.0"
+totp-rs = "5.0.1"

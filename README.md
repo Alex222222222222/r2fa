@@ -8,12 +8,13 @@ may be incompatible with other version of `ring`.
 ## Usage
 
 ```rust
-use libr2fa::HOTPKey
-use libr2fa::HMACType
+use libr2fa::HOTPKey;
+use libr2fa::HMACType;
+use libr2fa::Key;
 
 let mut hotp_key = HOTPKey {
     name: "".to_string(),
-    key: "your base32 encoded key".to_string(),
+    key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
     digits: 6,
     counter: 0,
     recovery_codes: Vec::default(),

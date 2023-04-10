@@ -1,5 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 /// Error type for the library
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum Error {
     /// Invalid key
     ///

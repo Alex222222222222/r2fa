@@ -1,16 +1,23 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
+
+#[cfg(any(feature = "qrcodegen", feature = "qrcoderead"))]
 use std::path::PathBuf;
 
+#[cfg(feature = "qrcodegen")]
 use image::DynamicImage;
+
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+#[cfg(any(feature = "qrcodegen", feature = "qrcoderead"))]
 use crate::error;
+
 use crate::HMACType;
 use crate::KeyType;
 
+#[cfg(feature = "qrcodegen")]
 use image::GenericImage;
 
 static URI_DATA_REGEX: Lazy<regex::Regex> =
@@ -82,6 +89,7 @@ impl URI {
     /// assert_eq!(uri.algorithm, HMACType::SHA256);
     /// assert_eq!(uri.secret, "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ".to_string());
     /// ```
+    #[cfg(feature = "qrcoderead")]
     pub fn from_qr_code(path: &str) -> Result<Self, error::Error> {
         // test if it is a valid path
         let path = PathBuf::from(path);
@@ -150,6 +158,7 @@ impl URI {
     /// ```
     ///
     /// ![QR code](https://raw.githubusercontent.com/Alex222222222222/r2fa/master/public/uri_qrcode_encode_test.png)
+    #[cfg(feature = "qrcodegen")]
     pub fn to_qr_code(&self, path: &str) -> Result<(), error::Error> {
         let path = PathBuf::from(path);
         // if path is not a file
@@ -186,6 +195,7 @@ impl Display for URI {
     }
 }
 
+#[cfg(feature = "qrcodegen")]
 impl From<URI> for DynamicImage {
     fn from(value: URI) -> Self {
         let uri = String::from(value);

@@ -237,6 +237,7 @@ pub fn otpauth_from_uri(uri: &str) -> Result<Box<dyn Key>, Error> {
 /// assert_eq!(totp_key1.get_type(), totp_key2.get_type());
 /// assert_eq!(totp_key1.get_code(), totp_key2.get_code());
 /// ```
+#[cfg(feature = "qrcoderead")]
 pub fn otpauth_from_uri_qrcode(path: &str) -> Result<Box<dyn Key>, Error> {
     let uri_struct = URI::from_qr_code(path)?;
 

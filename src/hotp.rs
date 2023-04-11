@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{error, HMACType, Key, OptAuthKey};
+use crate::{error, HMACType, Key, OtpAuthKey};
 
 /// HOTPKey is the key for the HOTP,
 /// HOTP is the counter based key,
@@ -71,7 +71,7 @@ impl HOTPKey {
     }
 }
 
-impl OptAuthKey for HOTPKey {
+impl OtpAuthKey for HOTPKey {
     fn to_uri_struct(&self) -> crate::URI {
         crate::URI {
             name: self.name.clone(),

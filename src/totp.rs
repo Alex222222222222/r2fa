@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{error, HMACType, Key, OptAuthKey};
+use crate::{error, HMACType, Key, OtpAuthKey};
 
 /// TOTPKey is the key for the TOTP,
 /// TOTP is the time based key,
@@ -73,7 +73,7 @@ impl TOTPKey {
     }
 }
 
-impl OptAuthKey for TOTPKey {
+impl OtpAuthKey for TOTPKey {
     fn to_uri_struct(&self) -> crate::URI {
         crate::URI {
             name: self.name.clone(),

@@ -247,7 +247,7 @@ pub fn otpauth_from_uri_qrcode(path: &str) -> Result<Box<dyn Key>, Error> {
     }
 }
 
-pub trait OptAuthKey {
+pub trait OtpAuthKey {
     /// to uri struct
     fn to_uri_struct(&self) -> URI;
 

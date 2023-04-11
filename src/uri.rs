@@ -148,7 +148,7 @@ impl URI {
     ///
     /// uri.to_qr_code("public/uri_qrcode_encode_test.png").unwrap();
     /// ```
-    /// 
+    ///
     /// ![QR code](https://raw.githubusercontent.com/Alex222222222222/r2fa/master/public/uri_qrcode_encode_test.png)
     pub fn to_qr_code(&self, path: &str) -> Result<(), error::Error> {
         let path = PathBuf::from(path);
@@ -215,9 +215,7 @@ impl From<URI> for DynamicImage {
             }
         }
 
-        let res = res.resize(2048, 2048, image::imageops::FilterType::Nearest);
-
-        res
+        res.resize(2048, 2048, image::imageops::FilterType::Nearest)
     }
 }
 

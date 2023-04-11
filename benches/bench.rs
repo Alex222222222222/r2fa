@@ -1,17 +1,3 @@
-// #[bench]
-// fn hotp_sha512_1000_times(b : &mut ) {
-// let mut hotp_key = HOTPKey {
-// key: "MZZHI6LHOVUGU===".to_string(),
-// counter: 4,
-// hmac_type: crate::HMACType::SHA512,
-// ..Default::default()
-// };
-//
-// for i in 0..1000 {
-// hotp_key.get_code().unwrap();
-// }
-// }
-//
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use libr2fa::Key;
 
@@ -23,7 +9,7 @@ pub fn otp_get_code_bench(c: &mut Criterion) {
         ..Default::default()
     };
     c.bench_function("hotp sha512 get code", |b| {
-        b.iter(|| hotp_key.get_code().unwrap())
+        b.iter(|| black_box(hotp_key.get_code().unwrap()))
     });
     drop(hotp_key);
 
@@ -33,7 +19,7 @@ pub fn otp_get_code_bench(c: &mut Criterion) {
         ..Default::default()
     };
     c.bench_function("totp sha512 get code", |b| {
-        b.iter(|| totp_key.get_code().unwrap())
+        b.iter(|| black_box(totp_key.get_code().unwrap()))
     });
     drop(totp_key);
 }

@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::path::PathBuf;
 
+use image::DynamicImage;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -9,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use crate::error;
 use crate::HMACType;
 use crate::KeyType;
+
+use image::GenericImage;
 
 static URI_DATA_REGEX: Lazy<regex::Regex> =
     Lazy::new(|| Regex::new(r"(secret|algorithm|digits|period|counter|issuer)=[^\s&]*").unwrap());
@@ -124,11 +127,97 @@ impl URI {
 
         Ok(URI::from(decoded))
     }
+
+    /// Convert the URI to a QR code,
+    /// and save it to the given path.
+    ///
+    /// The given dir must exists, and if the file already exists,
+    /// it will be overwritten.
+    /// If the path does not exists, a new file will be created.
+    ///
+    /// The default size of the QR code is 2048x2048.
+    /// The default color is black.
+    ///
+    /// ```rust
+    /// use libr2fa::URI;
+    ///
+    /// let uri = URI::new_from_uri(
+    ///     "otpauth://totp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co&algorithm=SHA256&digits=7&period=60"
+    ///         .to_string()
+    /// );
+    ///
+    /// uri.to_qr_code("public/uri_qrcode_encode_test.png").unwrap();
+    /// ```
+    /// 
+    /// ![QR code](https://raw.githubusercontent.com/Alex222222222222/r2fa/master/public/uri_qrcode_encode_test.png)
+    pub fn to_qr_code(&self, path: &str) -> Result<(), error::Error> {
+        let path = PathBuf::from(path);
+        // if path is not a file
+        if path.is_dir() {
+            return Err(error::Error::InvalidPath(
+                "target path is not a file".to_string(),
+            ));
+        }
+
+        let mut dir = path.clone();
+        dir.pop();
+        if !dir.exists() {
+            return Err(error::Error::InvalidPath(
+                "target path does not exists".to_string(),
+            ));
+        }
+
+        let img: DynamicImage = self.clone().into();
+        let res = img.save(path);
+        if let Err(e) = res {
+            return Err(error::Error::InvalidPath(format!(
+                "could not save file: {}",
+                e
+            )));
+        }
+
+        Ok(())
+    }
 }
 
 impl Display for URI {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", String::from(self.clone()))
+    }
+}
+
+impl From<URI> for DynamicImage {
+    fn from(value: URI) -> Self {
+        let uri = String::from(value);
+        let qr = qrcodegen::QrCode::encode_text(&uri, qrcodegen::QrCodeEcc::High).unwrap();
+
+        let size = qr.size() as u32;
+        let border = 4;
+        let mut res =
+            image::DynamicImage::new_luma8(size + border + border, size + border + border);
+
+        for y in 0..size + border + border {
+            for x in 0..size + border + border {
+                res.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
+            }
+        }
+
+        let size = size as i32;
+        for y in 0..size {
+            for x in 0..size {
+                if qr.get_module(x, y) {
+                    res.put_pixel(
+                        x as u32 + border,
+                        y as u32 + border,
+                        image::Rgba([0, 0, 0, 255]),
+                    );
+                }
+            }
+        }
+
+        let res = res.resize(2048, 2048, image::imageops::FilterType::Nearest);
+
+        res
     }
 }
 

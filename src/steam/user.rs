@@ -17,13 +17,13 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
+use rsa::{PublicKey, RsaPublicKey};
 
 use crate::{error, steam::api_response::RsaResponse};
 
 use super::{
     api_response::LoginResponse,
-    steam_api::{Session, SteamApiClient},
+    steam_api::{LoginParams, SteamApiClient},
 };
 
 /// Handles the user login flow.
@@ -43,7 +43,7 @@ pub struct UserLogin {
 
 impl UserLogin {
     pub fn new(username: String, password: String) -> UserLogin {
-        return UserLogin {
+        UserLogin {
             username,
             password,
             captcha_required: false,
@@ -53,11 +53,11 @@ impl UserLogin {
             email_code: String::from(""),
             steam_id: 0,
             client: SteamApiClient::new(None),
-        };
+        }
     }
 
     pub fn login(&mut self) -> Result<super::steam_api::Session, error::Error> {
-        if self.captcha_required && self.captcha_text.len() == 0 {
+        if self.captcha_required && self.captcha_text.is_empty() {
             return Err(error::Error::SteamLoginError(
                 error::SteamLoginError::NeedCaptcha {
                     captcha_gid: self.captcha_gid.clone(),
@@ -109,15 +109,17 @@ impl UserLogin {
         let rsa_timestamp = rsa_resp.timestamp.clone();
         let encrypted_password = encrypt_password(rsa_resp, &self.password);
 
-        let login_resp: LoginResponse = self.client.login(
-            self.username.clone(),
+        let login_params = LoginParams {
+            username: self.username.clone(),
             encrypted_password,
-            self.two_factor_code.clone(),
-            self.email_code.clone(),
-            self.captcha_gid.clone(),
-            self.captcha_text.clone(),
+            two_factor_code: self.two_factor_code.clone(),
+            email_code: self.email_code.clone(),
+            captcha_gid: self.captcha_gid.clone(),
+            captcha_text: self.captcha_text.clone(),
             rsa_timestamp,
-        )?;
+        };
+
+        let login_resp: LoginResponse = self.client.login(&login_params)?;
 
         if login_resp.message.contains("too many login") {
             return Err(error::Error::SteamLoginError(
@@ -132,7 +134,7 @@ impl UserLogin {
         }
 
         if login_resp.captcha_needed {
-            self.captcha_gid = login_resp.captcha_gid.clone();
+            self.captcha_gid = login_resp.captcha_gid;
             self.captcha_required = true;
             return Err(error::Error::SteamLoginError(
                 error::SteamLoginError::NeedCaptcha {
@@ -142,7 +144,7 @@ impl UserLogin {
         }
 
         if login_resp.email_auth_needed {
-            self.steam_id = login_resp.email_steam_id.clone();
+            self.steam_id = login_resp.email_steam_id;
             return Err(error::Error::SteamLoginError(
                 error::SteamLoginError::NeedEmail,
             ));
@@ -181,7 +183,5 @@ fn encrypt_password(rsa_resp: RsaResponse, password: &String) -> String {
         )
         .unwrap();
 
-    let encrypted_password = data_encoding::BASE64.encode(&encrypt_password);
-
-    encrypted_password
+    data_encoding::BASE64.encode(&encrypt_password)
 }

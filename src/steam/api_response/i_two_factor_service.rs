@@ -72,6 +72,8 @@ pub struct AddAuthenticatorResponse {
 }
 
 impl AddAuthenticatorResponse {
+    // TODO dead code
+    #[allow(dead_code)]
     pub fn to_steam_guard_account(&self) -> SteamGuardAccount {
         SteamGuardAccount {
             shared_secret: TwoFactorSecret::parse_shared_secret(self.shared_secret.clone())

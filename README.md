@@ -38,6 +38,12 @@ which used to read the qrcode with the given opt auth qrcode.
 Both `qrcodegen` and `qrcoderead` feature use the [`image`](https://crates.io/crates/image)
 crate, which will greatly increase the package size.
 
+### log
+
+- `log`
+
+This feature provided log support for the library.
+
 ## TODO
 
 - [ ] log feature

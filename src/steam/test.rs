@@ -14,7 +14,7 @@ fn steam_login() {
     std::io::stdin().read_line(&mut password).unwrap();
     let password = password.trim().to_string();
 
-    let mut login = super::user::UserLogin::new(username.to_string(), password.to_string());
+    let mut login = super::UserLogin::new(username.to_string(), password);
     let mut loops = 0;
 
     println!("Logging in as {}...", username);

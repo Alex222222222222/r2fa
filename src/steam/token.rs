@@ -4,7 +4,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 pub struct TwoFactorSecret([u8; 20]);
 
 impl TwoFactorSecret {
-    #[allow(dead_code)] // TODO remove this
     pub fn new() -> Self {
         Self([0u8; 20])
     }
@@ -77,6 +76,12 @@ impl TwoFactorSecret {
             [code_point as usize % steam_guard_code_translations.len()];
 
         String::from_utf8(code_array.to_vec()).unwrap()
+    }
+}
+
+impl Default for TwoFactorSecret {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

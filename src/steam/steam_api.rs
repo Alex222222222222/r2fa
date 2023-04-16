@@ -15,7 +15,7 @@ use crate::error;
 
 use super::api_response::{
     AddAuthenticatorResponse, FinalizeAddAuthenticatorResponse, LoginResponse, OAuthData,
-    PhoneValidateResponse, QueryTimeResponse, RemoveAuthenticatorResponse, SteamApiResponse,
+    PhoneValidateResponse, RemoveAuthenticatorResponse, SteamApiResponse,
 };
 
 static STEAM_COOKIE_URL: once_cell::sync::Lazy<reqwest::Url> =
@@ -23,11 +23,7 @@ static STEAM_COOKIE_URL: once_cell::sync::Lazy<reqwest::Url> =
 static STEAM_API_BASE_URL: once_cell::sync::Lazy<reqwest::Url> =
     once_cell::sync::Lazy::new(|| reqwest::Url::parse("https://api.steampowered.com").unwrap());
 
-const GET_SERVER_TIME_END_POINT: &str = "/ITwoFactorService/QueryTime/v0001";
-
-const GET_SERVER_TIME_ERROR_MESSAGE: &str = "Failed to get server time from Steam";
 const GET_SESSION_ERROR_MESSAGE: &str = "Failed to get session from Steam";
-const GET_OAUTH_DATA_ERROR_MESSAGE: &str = "Failed to get OAuth data from Steam";
 const LOGIN_ERROR_MESSAGE: &str = "Failed to login to Steam";
 const TRANSFER_LOGIN_ERROR_MESSAGE: &str = "Failed to transfer login to Steam";
 const PHONEAJAX_ERROR_MESSAGE: &str = "Failed to get phone ajax from Steam";
@@ -40,6 +36,30 @@ pub struct Session {
     pub web_cookie: Option<String>,
     pub token: String,
     pub steam_id: u64,
+}
+
+/// Parameters for the `login` endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginParams {
+    /// The username of the account to log in to.
+    pub username: String,
+    /// The password of the account to log in to,
+    /// encrypted with the RSA public key provided by the `get_rsa_key` endpoint.
+    pub encrypted_password: String,
+    /// Two factor code,
+    /// if steam guard already enabled
+    pub two_factor_code: String,
+    /// Email code,
+    /// if steam ask code for email send to account
+    pub email_code: String,
+    /// Captcha code,
+    /// if steam ask captcha
+    pub captcha_gid: String,
+    /// Captcha code,
+    /// if steam ask captcha
+    pub captcha_text: String,
+    /// The rsa timestamp of the RSA key used to encrypt the password.
+    pub rsa_timestamp: String,
 }
 
 /// Queries Steam for the current time.
@@ -62,28 +82,30 @@ pub struct Session {
 ///   }
 /// }
 /// ```
-pub fn get_server_time() -> Result<QueryTimeResponse, error::Error> {
-    let client = reqwest::blocking::Client::new();
-
-    let url = STEAM_API_BASE_URL.join(GET_SERVER_TIME_END_POINT).unwrap();
-
-    let resp = client.post(url).body("steamid=0").send();
-    if let Err(e) = resp {
-        return Err(error::Error::ReqwestError(
-            GET_SERVER_TIME_ERROR_MESSAGE.to_string(),
-            e.to_string(),
-        ));
-    }
-    let resp = resp.unwrap().json::<SteamApiResponse<QueryTimeResponse>>();
-    if let Err(e) = resp {
-        return Err(error::Error::ReqwestError(
-            GET_SERVER_TIME_ERROR_MESSAGE.to_string(),
-            e.to_string(),
-        ));
-    }
-
-    Ok(resp.unwrap().response)
-}
+// const GET_SERVER_TIME_ERROR_MESSAGE: &str = "Failed to get server time from Steam";
+// const GET_SERVER_TIME_END_POINT: &str = "/ITwoFactorService/QueryTime/v0001";
+// pub fn get_server_time() -> Result<QueryTimeResponse, error::Error> {
+//     let client = reqwest::blocking::Client::new();
+//
+//     let url = STEAM_API_BASE_URL.join(GET_SERVER_TIME_END_POINT).unwrap();
+//
+//     let resp = client.post(url).body("steamid=0").send();
+//     if let Err(e) = resp {
+//         return Err(error::Error::ReqwestError(
+//             GET_SERVER_TIME_ERROR_MESSAGE.to_string(),
+//             e.to_string(),
+//         ));
+//     }
+//     let resp = resp.unwrap().json::<SteamApiResponse<QueryTimeResponse>>();
+//     if let Err(e) = resp {
+//         return Err(error::Error::ReqwestError(
+//             GET_SERVER_TIME_ERROR_MESSAGE.to_string(),
+//             e.to_string(),
+//         ));
+//     }
+//
+//     Ok(resp.unwrap().response)
+// }
 
 /// Provides raw access to the Steam API. Handles cookies, some de serialization, etc. to make it easier. It covers `ITwoFactorService` from the Steam web API, and some mobile app specific api endpoints.
 #[derive(Debug)]
@@ -116,7 +138,7 @@ impl SteamApiClient {
     }
 
     fn build_session(&self, data: &OAuthData) -> Session {
-        return Session {
+        Session {
             token: data.oauth_token.clone(),
             steam_id: data.steamid.parse().unwrap(),
             steam_login: format!("{}%7C%7C{}", data.steamid, data.wgtoken),
@@ -125,21 +147,22 @@ impl SteamApiClient {
                 .extract_session_id()
                 .expect("failed to extract session id from cookies"),
             web_cookie: Some(data.webcookie.clone()),
-        };
+        }
     }
 
     fn extract_session_id(&self) -> Option<String> {
         let cookies = self.cookies.cookies(&STEAM_COOKIE_URL).unwrap();
         let cookies = cookies.to_str().unwrap();
-        for cookie in cookies.split(";") {
+        for cookie in cookies.split(';') {
             let cookie = cookie.trim();
-            let cookie = cookie.split("=");
+            let cookie = cookie.split('=');
             let cookie = cookie.collect::<Vec<&str>>();
             if cookie[0] == "sessionid" {
                 return Some(cookie[1].into());
             }
         }
-        return None;
+
+        None
     }
 
     pub fn save_cookies_from_response(&mut self, response: &reqwest::blocking::Response) {
@@ -207,16 +230,7 @@ impl SteamApiClient {
     }
 
     /// Endpoint: POST /login/dologin
-    pub fn login(
-        &mut self,
-        username: String,
-        encrypted_password: String,
-        two_factor_code: String,
-        email_code: String,
-        captcha_gid: String,
-        captcha_text: String,
-        rsa_timestamp: String,
-    ) -> Result<LoginResponse, error::Error> {
+    pub fn login(&mut self, login_params: &LoginParams) -> Result<LoginResponse, error::Error> {
         let mut params: HashMap<String, String> = HashMap::new();
         params.insert(
             "donotcache".into(),
@@ -229,13 +243,13 @@ impl SteamApiClient {
                     * 1000
             ),
         );
-        params.insert("username".into(), username);
-        params.insert("password".into(), encrypted_password);
-        params.insert("twofactorcode".into(), two_factor_code);
-        params.insert("emailauth".into(), email_code);
-        params.insert("captchagid".into(), captcha_gid);
-        params.insert("captcha_text".into(), captcha_text);
-        params.insert("rsatimestamp".into(), rsa_timestamp);
+        params.insert("username".into(), login_params.username.clone());
+        params.insert("password".into(), login_params.encrypted_password.clone());
+        params.insert("twofactorcode".into(), login_params.two_factor_code.clone());
+        params.insert("emailauth".into(), login_params.email_code.clone());
+        params.insert("captchagid".into(), login_params.captcha_gid.clone());
+        params.insert("captcha_text".into(), login_params.captcha_text.clone());
+        params.insert("rsatimestamp".into(), login_params.rsa_timestamp.clone());
         params.insert("remember_login".into(), "true".into());
         params.insert("oauth_client_id".into(), "DE45CD61".into());
         params.insert(
@@ -270,21 +284,21 @@ impl SteamApiClient {
         if let Err(e) = login_resp {
             return Err(error::Error::SteamSerdeError(
                 LOGIN_ERROR_MESSAGE.to_string(),
-                text.to_string(),
+                text,
                 e.to_string(),
             ));
         };
 
-        // TODO delete this 
+        // TODO delete this
         println!("{}", text);
 
         let login_resp = login_resp.unwrap();
 
         if let Some(oauth) = &login_resp.oauth {
-            self.session = Some(self.build_session(&oauth));
+            self.session = Some(self.build_session(oauth));
         }
 
-        return Ok(login_resp);
+        Ok(login_resp)
     }
 
     /// A secondary step in the login flow. Does not seem to always be needed?
@@ -312,26 +326,23 @@ impl SteamApiClient {
                     webcookie: params.webcookie,
                 };
                 self.session = Some(self.build_session(&oauth));
-                return Ok(oauth);
+
+                Ok(oauth)
             }
-            (None, None) => {
-                return Err(error::Error::SteamError(
-                    TRANSFER_LOGIN_ERROR_MESSAGE.to_string(),
-                    "did not receive transfer_parameters or transfer_urls".to_string(),
-                ));
-            }
-            (_, None) => {
-                return Err(error::Error::SteamError(
-                    TRANSFER_LOGIN_ERROR_MESSAGE.to_string(),
-                    "did not receive transfer_parameters".to_string(),
-                ));
-            }
-            (None, _) => {
-                Err(error::Error::SteamError(
-                    TRANSFER_LOGIN_ERROR_MESSAGE.to_string(),
-                    "did not receive transfer_urls".to_string(),
-                ))
-            }
+            (None, None) => Err(error::Error::SteamError(
+                TRANSFER_LOGIN_ERROR_MESSAGE.to_string(),
+                "did not receive transfer_parameters or transfer_urls".to_string(),
+            )),
+
+            (_, None) => Err(error::Error::SteamError(
+                TRANSFER_LOGIN_ERROR_MESSAGE.to_string(),
+                "did not receive transfer_parameters".to_string(),
+            )),
+
+            (None, _) => Err(error::Error::SteamError(
+                TRANSFER_LOGIN_ERROR_MESSAGE.to_string(),
+                "did not receive transfer_urls".to_string(),
+            )),
         }
     }
 
@@ -421,7 +432,7 @@ impl SteamApiClient {
     ///
     /// Host: store.steampowered.com
     /// Endpoint: /phone/add_ajaxop
-    fn phone_add_ajaxop(&self, op: &str, input: &str) -> Result<String, error::Error> {
+    pub fn phone_add_ajaxop(&self, op: &str, input: &str) -> Result<String, error::Error> {
         let mut params = HashMap::new();
         params.insert("op", op);
         params.insert("input", input);
@@ -456,15 +467,15 @@ impl SteamApiClient {
     }
 
     pub fn has_phone(&self) -> Result<bool, error::Error> {
-        return self.phoneajax("has_phone", "null");
+        self.phoneajax("has_phone", "null")
     }
 
     pub fn check_sms_code(&self, sms_code: String) -> Result<bool, error::Error> {
-        return self.phoneajax("check_sms_code", sms_code.as_str());
+        self.phoneajax("check_sms_code", sms_code.as_str())
     }
 
     pub fn check_email_confirmation(&self) -> Result<bool, error::Error> {
-        return self.phoneajax("email_confirmation", "");
+        self.phoneajax("email_confirmation", "")
     }
 
     pub fn add_phone_number(&self, phone_number: String) -> Result<bool, error::Error> {
@@ -483,14 +494,14 @@ impl SteamApiClient {
     /// Found on page: https://store.steampowered.com/phone/add
     pub fn phone_validate(
         &self,
-        phone_number: &String,
+        phone_number: &str,
     ) -> Result<PhoneValidateResponse, error::Error> {
         let mut params = HashMap::new();
         params.insert(
             "sessionID",
             self.session.as_ref().unwrap().session_id.as_str(),
         );
-        params.insert("phoneNumber", phone_number.as_str());
+        params.insert("phoneNumber", phone_number);
 
         let resp = self
             .client
@@ -528,7 +539,7 @@ impl SteamApiClient {
     }
 
     /// Starts the authenticator linking process.
-    /// This doesn't check any prereqisites to ensure the request will pass validation on Steam's side (eg. sms/email confirmations).
+    /// This doesn't check any prerequisites to ensure the request will pass validation on Steam's side (eg. sms/email confirmations).
     /// A valid `Session` is required for this request. Cookies are not needed for this request, but they are set anyway.
     ///
     /// Host: api.steampowered.com
@@ -559,7 +570,7 @@ impl SteamApiClient {
         let resp = self
             .post(format!(
                 "{}/ITwoFactorService/AddAuthenticator/v0001",
-                STEAM_API_BASE_URL.to_string()
+                *STEAM_API_BASE_URL
             ))
             .form(&params)
             .send();
@@ -626,7 +637,7 @@ impl SteamApiClient {
         let resp = self
             .post(format!(
                 "{}/ITwoFactorService/FinalizeAddAuthenticator/v0001",
-                STEAM_API_BASE_URL.to_string()
+                *STEAM_API_BASE_URL,
             ))
             .form(&params)
             .send();
@@ -665,6 +676,9 @@ impl SteamApiClient {
 
     /// Host: api.steampowered.com
     /// Endpoint: POST /ITwoFactorService/RemoveAuthenticator/v0001
+    ///
+    /// TODO dead code
+    #[allow(dead_code)]
     pub fn remove_authenticator(
         &self,
         revocation_code: String,
@@ -682,7 +696,7 @@ impl SteamApiClient {
         let resp = self
             .post(format!(
                 "{}/ITwoFactorService/RemoveAuthenticator/v0001",
-                STEAM_API_BASE_URL.to_string()
+                *STEAM_API_BASE_URL
             ))
             .form(&params)
             .send();

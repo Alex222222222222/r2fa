@@ -35,13 +35,15 @@ reqwest = { version = "0.11", features = [
 serde_json = { version = "1.0.96", optional = true }
 rsa = { version = "0.8.2", optional = true }
 rand = { version = "0.8.5", optional = true }
+log = { version = "0.4.17", optional = true }
 
 [features]
-default = ["qrcode", "steam"]
+default = ["qrcode", "steam", "log"]
 qrcode = ["qrcoderead", "qrcodegen"]
 qrcoderead = ["dep:rqrr", "dep:image"]
 qrcodegen = ["dep:qrcodegen", "dep:image"]
 steam = ["dep:reqwest", "dep:serde_json", "dep:rsa", "dep:rand"]
+log = ["dep:log"]
 
 [dev-dependencies]
 libauthenticator = "0.1.0"

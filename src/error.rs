@@ -19,6 +19,18 @@ pub enum Error {
     InvalidURI(String),
     /// invalid file path
     InvalidPath(String),
+    /// reqwest error, with when the error happen and a description of the error
+    #[cfg(feature = "steam")]
+    ReqwestError(String, String),
+    /// error in serde in steam module
+    #[cfg(feature = "steam")]
+    SteamSerdeError(String, String, String),
+    /// error in steam return result
+    #[cfg(feature = "steam")]
+    SteamError(String, String),
+    /// steam login error
+    #[cfg(feature = "steam")]
+    SteamLoginError(SteamLoginError),
 }
 
 impl std::fmt::Display for Error {
@@ -28,6 +40,47 @@ impl std::fmt::Display for Error {
             Error::InvalidDigits => write!(f, "Invalid digits"),
             Error::InvalidURI(s) => write!(f, "Invalid URI: {}", s),
             Error::InvalidPath(s) => write!(f, "Invalid path: {}", s),
+            #[cfg(feature = "steam")]
+            Error::ReqwestError(s1, s2) => write!(f, "Reqwest error: {}, {}", s1, s2),
+            #[cfg(feature = "steam")]
+            Error::SteamSerdeError(s1, s2, s3) => {
+                write!(f, "Steam serde error: {}, {}, {}", s1, s2, s3)
+            }
+            #[cfg(feature = "steam")]
+            Error::SteamError(s1, s2) => write!(f, "Steam error: {}, {}", s1, s2),
+            #[cfg(feature = "steam")]
+            Error::SteamLoginError(s2) => write!(f, "Steam login error: {}", s2),
+        }
+    }
+}
+
+#[cfg(feature = "steam")]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum SteamLoginError {
+    BadRSA(String),
+    BadCredentials,
+    NeedCaptcha { captcha_gid: String },
+    Need2FA,
+    NeedEmail,
+    TooManyAttempts,
+    NetworkFailure(String),
+    OtherFailure(String),
+}
+
+#[cfg(feature = "steam")]
+impl std::fmt::Display for SteamLoginError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SteamLoginError::BadRSA(s) => write!(f, "Bad RSA: {}", s),
+            SteamLoginError::BadCredentials => write!(f, "Bad credentials"),
+            SteamLoginError::NeedCaptcha { captcha_gid } => {
+                write!(f, "Need captcha: {}", captcha_gid)
+            }
+            SteamLoginError::Need2FA => write!(f, "Need 2FA"),
+            SteamLoginError::NeedEmail => write!(f, "Need email"),
+            SteamLoginError::TooManyAttempts => write!(f, "Too many attempts"),
+            SteamLoginError::NetworkFailure(s) => write!(f, "Network failure: {}", s),
+            SteamLoginError::OtherFailure(s) => write!(f, "Other failure: {}", s),
         }
     }
 }

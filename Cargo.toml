@@ -25,12 +25,23 @@ url = "2.3.1"
 rqrr = { version = "0.6.0", optional = true }
 image = { version = "0.24.6", optional = true }
 qrcodegen = { version = "1.8.0", optional = true }
+reqwest = { version = "0.11", features = [
+  "blocking",
+  "json",
+  "cookies",
+  "gzip",
+  "rustls-tls",
+], optional = true }
+serde_json = { version = "1.0.96", optional = true }
+rsa = { version = "0.8.2", optional = true }
+rand = { version = "0.8.5", optional = true }
 
 [features]
-default = ["qrcode"]
+default = ["qrcode", "steam"]
 qrcode = ["qrcoderead", "qrcodegen"]
 qrcoderead = ["dep:rqrr", "dep:image"]
 qrcodegen = ["dep:qrcodegen", "dep:image"]
+steam = ["dep:reqwest", "dep:serde_json", "dep:rsa", "dep:rand"]
 
 [dev-dependencies]
 libauthenticator = "0.1.0"

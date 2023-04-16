@@ -38,6 +38,15 @@ which used to read the qrcode with the given opt auth qrcode.
 Both `qrcodegen` and `qrcoderead` feature use the [`image`](https://crates.io/crates/image)
 crate, which will greatly increase the package size.
 
+## TODO
+
+- [ ] log feature
+- [ ] steam guard
+  - [x] steam login
+  - [ ] add steam guard method
+  - [ ] remove steam guard method
+  - [ ] confirmations
+
 ## Usage
 
 ### Manually Create the Struct

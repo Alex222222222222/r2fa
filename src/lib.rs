@@ -28,6 +28,9 @@ pub use hotp::HOTPKey;
 pub use totp::TOTPKey;
 pub use uri::URI;
 
+#[cfg(feature = "steam")]
+pub mod steam;
+
 #[cfg(test)]
 mod test;
 

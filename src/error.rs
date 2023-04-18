@@ -62,6 +62,8 @@ pub enum SteamLoginError {
     NeedCaptcha { captcha_gid: String },
     Need2FA,
     NeedEmail,
+    NeedEmailConfirmation,
+    NeedSMS,
     TooManyAttempts,
     NetworkFailure(String),
     OtherFailure(String),
@@ -78,6 +80,8 @@ impl std::fmt::Display for SteamLoginError {
             }
             SteamLoginError::Need2FA => write!(f, "Need 2FA"),
             SteamLoginError::NeedEmail => write!(f, "Need email"),
+            SteamLoginError::NeedSMS => write!(f, "Need SMS"),
+            SteamLoginError::NeedEmailConfirmation => write!(f, "Need email confirmation"),
             SteamLoginError::TooManyAttempts => write!(f, "Too many attempts"),
             SteamLoginError::NetworkFailure(s) => write!(f, "Network failure: {}", s),
             SteamLoginError::OtherFailure(s) => write!(f, "Other failure: {}", s),

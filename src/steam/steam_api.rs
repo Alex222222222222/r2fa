@@ -4,6 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use regex::Regex;
 use reqwest::{
     blocking,
     cookie::CookieStore,
@@ -15,18 +16,25 @@ use crate::error;
 
 use super::api_response::{
     AddAuthenticatorResponse, FinalizeAddAuthenticatorResponse, LoginResponse, OAuthData,
-    PhoneValidateResponse, RemoveAuthenticatorResponse, SteamApiResponse,
+    PhoneAjaxResponse, PhoneValidateResponse, RemoveAuthenticatorResponse, SteamApiResponse,
 };
 
 static STEAM_COOKIE_URL: once_cell::sync::Lazy<reqwest::Url> =
     once_cell::sync::Lazy::new(|| reqwest::Url::parse("https://steamcommunity.com").unwrap());
 static STEAM_API_BASE_URL: once_cell::sync::Lazy<reqwest::Url> =
     once_cell::sync::Lazy::new(|| reqwest::Url::parse("https://api.steampowered.com").unwrap());
+static STEAM_STORE_BASE_URL: once_cell::sync::Lazy<reqwest::Url> =
+    once_cell::sync::Lazy::new(|| reqwest::Url::parse("https://store.steampowered.com").unwrap());
+
+static VERIFY_LOGIN_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
+    Regex::new(r#"<div\s+id="content_login"\s*([^\s="<>]+="[^"]*"\s*|[^\s="<>]+\s*)*>"#).unwrap()
+});
 
 const GET_SESSION_ERROR_MESSAGE: &str = "Failed to get session from Steam";
 const LOGIN_ERROR_MESSAGE: &str = "Failed to login to Steam";
 const TRANSFER_LOGIN_ERROR_MESSAGE: &str = "Failed to transfer login to Steam";
 const PHONEAJAX_ERROR_MESSAGE: &str = "Failed to get phone ajax from Steam";
+const VERIFY_LOGIN_ERROR_MESSAGE: &str = "Failed to get steam home page";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
@@ -173,6 +181,12 @@ impl SteamApiClient {
                 .into_iter()
                 .for_each(|cookie_str| self.cookies.add_cookie_str(cookie_str, &STEAM_COOKIE_URL));
         }
+
+        let id = self.extract_session_id().unwrap();
+
+        if self.session.is_some() {
+            self.session.as_mut().unwrap().session_id = id;
+        }
     }
 
     pub fn request<U: reqwest::IntoUrl + std::fmt::Display>(
@@ -180,12 +194,12 @@ impl SteamApiClient {
         method: reqwest::Method,
         url: U,
     ) -> blocking::RequestBuilder {
-        self.cookies
-            .add_cookie_str("mobileClientVersion=0 (2.1.3)", &STEAM_COOKIE_URL);
-        self.cookies
-            .add_cookie_str("mobileClient=android", &STEAM_COOKIE_URL);
-        self.cookies
-            .add_cookie_str("Steam_Language=english", &STEAM_COOKIE_URL);
+        // self.cookies
+            // .add_cookie_str("mobileClientVersion=0 (2.1.3)", &STEAM_COOKIE_URL);
+        // self.cookies
+            // .add_cookie_str("mobileClient=android", &STEAM_COOKIE_URL);
+        // self.cookies
+            // .add_cookie_str("Steam_Language=english", &STEAM_COOKIE_URL);
         if let Some(session) = &self.session {
             self.cookies.add_cookie_str(
                 format!("sessionid={}", session.session_id).as_str(),
@@ -346,6 +360,116 @@ impl SteamApiClient {
         }
     }
 
+    /// Verify login state by request steam main page.
+    ///
+    /// There is a `<div>` with `id = "content_login"`.
+    /// If successfully logged in, there will be a `style="display: none;"` attribute.
+    ///
+    /// Host: store.steampowered.com
+    /// Endpoint: GET /
+    ///
+    /// ```html
+    /// <div id="content_login" class="page_content_ctn dark" style="display: none;">
+    ///     <div class="home_page_content">
+    ///         <div class="more_content_title">
+    ///             <span>Looking for recommendations?</span>
+    ///         </div>
+    ///     </div>
+    ///     <div class="home_page_content">
+    ///         <div class="home_page_sign_in_ctn small">
+    ///             <p>Sign in to view personalized recommendations</p>
+    ///             <div class="signin_buttons_ctn">
+    ///                 <a class="btn_green_white_innerfade btn_border_2px btn_medium" href="https://store.steampowered.com/login/?snr=1_4_4__more-content-login">
+    ///                     <span>Sign In</span>
+    ///                 </a>
+    ///                 <br><br>
+    ///                 Or <a href="https://store.steampowered.com/join/?snr=1_4_4__more-content-login">sign up</a> and join Steam for free
+    ///             </div>
+    ///         </div>
+    ///     </div>
+    /// </div>
+    /// ```
+    pub fn verify_login(&mut self) -> Result<bool, error::Error> {
+        let resp = self.get(STEAM_STORE_BASE_URL.as_str()).send();
+        if let Err(e) = resp {
+            return Err(error::Error::ReqwestError(
+                VERIFY_LOGIN_ERROR_MESSAGE.to_string(),
+                e.to_string(),
+            ));
+        }
+        let resp = resp.unwrap();
+
+        self.save_cookies_from_response(&resp);
+
+        let text = resp.text();
+        if let Err(e) = text {
+            return Err(error::Error::ReqwestError(
+                VERIFY_LOGIN_ERROR_MESSAGE.to_string(),
+                e.to_string(),
+            ));
+        }
+        let text = text.unwrap();
+
+        let res = VERIFY_LOGIN_REGEX.captures(&text);
+        if res.is_none() {
+            return Err(error::Error::SteamError(
+                VERIFY_LOGIN_ERROR_MESSAGE.to_string(),
+                "could not find login div".to_string(),
+            ));
+        }
+        let res = res.unwrap();
+
+        if res.len() < 1 {
+            return Err(error::Error::SteamError(
+                VERIFY_LOGIN_ERROR_MESSAGE.to_string(),
+                "could not find login div".to_string(),
+            ));
+        }
+
+        let mut style = false;
+        for i in 1..res.len() {
+            if let Some(key) = res.get(i) {
+                let key = key.as_str();
+                let key = key.trim();
+                if !key.starts_with("style") {
+                    continue;
+                }
+
+                let value: Vec<&str> = key.split('=').collect();
+                if value.len() < 2 {
+                    continue;
+                }
+                let value = value[1];
+
+                // value is wrapped in `"`, remove this
+                let value = value.trim_matches('"');
+
+                let value: Vec<&str> = value.split(';').collect();
+                for v in value {
+                    // find first `:` to split key and value
+                    let v: Vec<&str> = v.split(':').collect();
+                    if v.len() < 2 {
+                        continue;
+                    }
+
+                    let key = v[0];
+                    let key = key.trim();
+                    if key != "display" {
+                        continue;
+                    }
+
+                    let value = v[1];
+                    let value = value.trim();
+                    if value == "none" {
+                        style = true;
+                    }
+                }
+            }
+        }
+
+        Ok(style)
+    }
+
     /// Likely removed now
     ///
     /// One of the endpoints that handles phone number things. Can check to see if phone is present on account, and maybe do some other stuff. It's not really super clear.
@@ -463,6 +587,7 @@ impl SteamApiClient {
         };
 
         // TODO check the result of the text
+        println!("text: {:?}", text);
         Ok(text.unwrap())
     }
 
@@ -478,20 +603,297 @@ impl SteamApiClient {
         self.phoneajax("email_confirmation", "")
     }
 
-    pub fn add_phone_number(&self, phone_number: String) -> Result<bool, error::Error> {
-        // TODO
-        return self.phoneajax("add_phone_number", phone_number.as_str());
+    /// Add a phone number to the account.
+    ///
+    /// This is a multi step process.
+    /// 1. Send the phone number to add to the account to `add_phone_number` op.
+    ///
+    /// 2. if NeedEmailConfirmation is returned, then there should be a email send to user mail box to confirm the email address.
+    ///
+    /// 3. if NeedSms is returned, then there should be a sms send to user phone number to confirm the phone number. And you need to call `confirm_phone_number(code: String)` to confirm the phone number.
+    ///
+    /// - Host: store.steampowered.com
+    /// - Endpoint: POST /phone/add_ajaxop
+    /// - Body format: form data
+    ///   - op: get_phone_number
+    ///   - input: phone number
+    ///   - sessionID: session id
+    ///   - confirmed: 1
+    ///   - checkfortos: 1
+    ///   - bisediting: 0
+    ///   - token: 0
+    pub fn add_phone_number(&self, phone_number: String) -> Result<(), error::Error> {
+        let mut params = HashMap::new();
+        params.insert("op", "get_phone_number");
+        let phone_number =
+            url::form_urlencoded::byte_serialize(phone_number.as_bytes()).collect::<String>();
+        params.insert("input", &phone_number);
+        params.insert(
+            "sessionid",
+            self.session.as_ref().unwrap().session_id.as_str(),
+        );
+        params.insert("confirmed", "1");
+        params.insert("checkfortos", "1");
+        params.insert("bisediting", "0");
+        params.insert("token", "0");
+
+        let resp = self
+            .post(STEAM_STORE_BASE_URL.join("phone/add_ajaxop").unwrap())
+            .form(&params)
+            .send();
+        if let Err(e) = resp {
+            return Err(error::Error::ReqwestError(
+                PHONEAJAX_ERROR_MESSAGE.to_string(),
+                e.to_string(),
+            ));
+        };
+        let resp = resp.unwrap();
+
+        let text = resp.text();
+        if let Err(e) = text {
+            return Err(error::Error::ReqwestError(
+                PHONEAJAX_ERROR_MESSAGE.to_string(),
+                e.to_string(),
+            ));
+        };
+        let text = text.unwrap();
+
+        println!("text: {}", text);
+
+        let result: Result<PhoneAjaxResponse, serde_json::Error> =
+            serde_json::from_str(text.as_str());
+        if let Err(e) = result {
+            return Err(error::Error::SteamSerdeError(
+                PHONEAJAX_ERROR_MESSAGE.to_string(),
+                text,
+                e.to_string(),
+            ));
+        };
+        let result = result.unwrap();
+
+        if !result.error_text.is_empty() {
+            return Err(error::Error::SteamError(
+                PHONEAJAX_ERROR_MESSAGE.to_string(),
+                result.error_text,
+            ));
+        }
+
+        if result.success && result.state == *"email_verification" {
+            return Err(error::Error::SteamLoginError(
+                error::SteamLoginError::NeedEmailConfirmation,
+            ));
+        }
+
+        if result.success && result.state == *"get_sms_code" {
+            return Err(error::Error::SteamLoginError(
+                error::SteamLoginError::NeedSMS,
+            ));
+        }
+
+        if result.success && result.state == *"done" {
+            return Ok(());
+        }
+
+        Err(error::Error::SteamError(
+            "Error in add phone number".to_string(),
+            "Unknown error".to_string(),
+        ))
     }
 
+    /// Confirm the phone number.
+    /// This is a multi step process.
+    /// 1. Send the phone number to add to the account to `add_phone_number` op.
+    ///
+    /// 2. if NeedEmailConfirmation is returned, then there should be a email send to user mail box to confirm the email address.
+    ///
+    /// 3. if NeedSms is returned, then there should be a sms send to user phone number to confirm the phone number. And you need to call `confirm_phone_number(code: String)` to confirm the phone number.
+    ///
+    /// - Host: store.steampowered.com
+    /// - Endpoint: POST /phone/add_ajaxop
+    /// - Body format: form data
+    ///  - op: email_verification
+    ///  - input: ""
+    ///  - sessionID: session id
+    ///  - confirmed: 1
+    ///  - checkfortos: 1
+    ///  - bisediting: 0
+    ///  - token: 0
+    pub fn add_phone_email_confirmation(&self) -> Result<(), error::Error> {
+        let mut params = HashMap::new();
+        params.insert("op", "email_verification");
+        params.insert("input", "");
+        params.insert(
+            "sessionID",
+            self.session.as_ref().unwrap().session_id.as_str(),
+        );
+        params.insert("confirmed", "1");
+        params.insert("checkfortos", "1");
+        params.insert("bisediting", "0");
+        params.insert("token", "0");
+
+        let resp = self
+            .post(STEAM_STORE_BASE_URL.join("steamguard/phoneajax").unwrap())
+            .form(&params)
+            .send();
+        if let Err(e) = resp {
+            return Err(error::Error::ReqwestError(
+                PHONEAJAX_ERROR_MESSAGE.to_string(),
+                e.to_string(),
+            ));
+        };
+        let resp = resp.unwrap();
+
+        let text = resp.text();
+        if let Err(e) = text {
+            return Err(error::Error::ReqwestError(
+                PHONEAJAX_ERROR_MESSAGE.to_string(),
+                e.to_string(),
+            ));
+        };
+        let text = text.unwrap();
+
+        println!("text: {}", text);
+
+        let result: Result<PhoneAjaxResponse, serde_json::Error> = serde_json::from_str(&text);
+        if let Err(e) = result {
+            return Err(error::Error::SteamSerdeError(
+                PHONEAJAX_ERROR_MESSAGE.to_string(),
+                text,
+                e.to_string(),
+            ));
+        };
+        let result = result.unwrap();
+
+        if !result.error_text.is_empty() {
+            return Err(error::Error::SteamError(
+                "Error in add phone number".to_string(),
+                result.error_text,
+            ));
+        }
+
+        if result.success && result.state == *"email_verification" {
+            return Err(error::Error::SteamLoginError(
+                error::SteamLoginError::NeedEmailConfirmation,
+            ));
+        }
+
+        if result.success && result.state == *"get_sms_code" {
+            return Err(error::Error::SteamLoginError(
+                error::SteamLoginError::NeedSMS,
+            ));
+        }
+
+        if result.success && result.state == *"done" {
+            return Ok(());
+        }
+
+        Err(error::Error::SteamError(
+            "Error in add phone number".to_string(),
+            "Unknown error".to_string(),
+        ))
+    }
+
+    /// Confirm the phone number.
+    ///
+    /// This is a multi step process.
+    /// 1. Send the phone number to add to the account to `add_phone_number` op.
+    ///
+    /// 2. if NeedEmailConfirmation is returned, then there should be a email send to user mail box to confirm the email address.
+    ///
+    /// 3. if NeedSms is returned, then there should be a sms send to user phone number to confirm the phone number. And you need to call `confirm_phone_number(code: String)` to confirm the phone number.
+    ///
+    /// - Host: store.steampowered.com
+    /// - Endpoint: POST /phone/add_ajaxop
+    /// - Body format: form data
+    ///  - op: get_sms_code
+    ///  - input: sms code
+    ///  - sessionID: session id
+    ///  - confirmed: 1
+    ///  - checkfortos: 1
+    ///  - bisediting: 0
+    ///  - token: 0
+    pub fn confirm_phone_number(&self, sms_code: String) -> Result<(), error::Error> {
+        let mut params = HashMap::new();
+        params.insert("op", "get_sms_code");
+        params.insert("input", sms_code.as_str());
+        params.insert(
+            "sessionID",
+            self.session.as_ref().unwrap().session_id.as_str(),
+        );
+        params.insert("confirmed", "1");
+        params.insert("checkfortos", "1");
+        params.insert("bisediting", "0");
+        params.insert("token", "0");
+
+        let resp = self
+            .post(STEAM_STORE_BASE_URL.join("/phone/add_ajaxop").unwrap())
+            .form(&params)
+            .send();
+        if let Err(e) = resp {
+            return Err(error::Error::ReqwestError(
+                PHONEAJAX_ERROR_MESSAGE.to_string(),
+                e.to_string(),
+            ));
+        };
+        let resp = resp.unwrap();
+
+        let text = resp.text();
+        if let Err(e) = text {
+            return Err(error::Error::ReqwestError(
+                PHONEAJAX_ERROR_MESSAGE.to_string(),
+                e.to_string(),
+            ));
+        };
+        let text = text.unwrap();
+
+        let result: Result<PhoneAjaxResponse, serde_json::Error> =
+            serde_json::from_str(text.as_str());
+        if let Err(e) = result {
+            return Err(error::Error::SteamSerdeError(
+                PHONEAJAX_ERROR_MESSAGE.to_string(),
+                text,
+                e.to_string(),
+            ));
+        };
+        let result = result.unwrap();
+
+        if !result.error_text.is_empty() {
+            return Err(error::Error::SteamError(
+                "Error in confirm phone number".to_string(),
+                result.error_text,
+            ));
+        }
+
+        if result.success && result.state == *"email_verification" {
+            return Err(error::Error::SteamLoginError(
+                error::SteamLoginError::NeedEmailConfirmation,
+            ));
+        }
+
+        if result.success && result.state == *"get_sms_code" {
+            return Err(error::Error::SteamLoginError(
+                error::SteamLoginError::NeedSMS,
+            ));
+        }
+
+        if result.success && result.state == *"done" {
+            return Ok(());
+        }
+
+        Err(error::Error::SteamError(
+            "Error in confirm phone number".to_string(),
+            "Unknown error".to_string(),
+        ))
+    }
+
+    /// Validate if a number is valid.
     /// Provides lots of juicy information, like if the number is a VOIP number.
+    ///
     /// Host: store.steampowered.com
     /// Endpoint: POST /phone/validate
     /// Body format: form data
-    /// Example:
-    /// ```form
-    /// sessionID=FOO&phoneNumber=%2B1+1234567890
-    /// ```
-    /// Found on page: https://store.steampowered.com/phone/add
+    /// - sessionID: session id
+    /// - phoneNumber: phone number
     pub fn phone_validate(
         &self,
         phone_number: &str,
@@ -501,13 +903,30 @@ impl SteamApiClient {
             "sessionID",
             self.session.as_ref().unwrap().session_id.as_str(),
         );
-        params.insert("phoneNumber", phone_number);
+        params.insert("phoneNumber", &phone_number);
+
+        let resp = self
+            .post(STEAM_STORE_BASE_URL.join("/phone/validate").unwrap())
+            .form(&params);
+        let resp = resp.build().unwrap();
+        let body = resp.body().unwrap().as_bytes().unwrap();
+        println!("{}", String::from_utf8(body.to_vec()).unwrap());
+        let header = resp.headers();
+        println!("{:?}", header);
+
+        let mut params = HashMap::new();
+        params.insert(
+            "sessionID",
+            self.session.as_ref().unwrap().session_id.as_str(),
+        );
+        params.insert("phoneNumber", &phone_number);
 
         let resp = self
             .client
-            .post("https://store.steampowered.com/phone/validate")
+            .post(STEAM_STORE_BASE_URL.join("/phone/validate").unwrap())
             .form(&params)
             .send();
+
         if let Err(e) = resp {
             return Err(error::Error::ReqwestError(
                 PHONEAJAX_ERROR_MESSAGE.to_string(),
@@ -524,8 +943,9 @@ impl SteamApiClient {
             ));
         };
         let body = body.unwrap();
+        println!("{}", body);
 
-        let res = serde_json::from_str::<SteamApiResponse<PhoneValidateResponse>>(body.as_str());
+        let res = serde_json::from_str::<PhoneValidateResponse>(body.as_str());
         if let Err(e) = res {
             return Err(error::Error::SteamSerdeError(
                 PHONEAJAX_ERROR_MESSAGE.to_string(),
@@ -535,7 +955,7 @@ impl SteamApiClient {
         };
         let res = res.unwrap();
 
-        Ok(res.response)
+        Ok(res)
     }
 
     /// Starts the authenticator linking process.
@@ -677,8 +1097,7 @@ impl SteamApiClient {
     /// Host: api.steampowered.com
     /// Endpoint: POST /ITwoFactorService/RemoveAuthenticator/v0001
     ///
-    /// TODO dead code
-    #[allow(dead_code)]
+    #[warn(unused_must_use)]
     pub fn remove_authenticator(
         &self,
         revocation_code: String,

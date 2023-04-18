@@ -12,3 +12,5 @@ Cargo.lock
 # IDE
 .vscode
 .vim
+
+public/steam_session.json

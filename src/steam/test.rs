@@ -90,53 +90,7 @@ fn steam_login_with_session() {
 
 #[ignore = "requires confidential data"]
 #[test]
-fn steam_login_has_phone() {
-    // load the session info from "public/steam_session.json"
-    let session_file = std::fs::File::open("public/steam_session.json").unwrap();
-    let session: super::steam_api::Session = serde_json::from_reader(session_file).unwrap();
-
-    let mut api_client = super::steam_api::SteamApiClient::new(Some(session));
-
-    let res = api_client.update_session();
-
-    println!("Result: {:?}", res);
-    assert!(res.is_ok());
-
-    let res = api_client.has_phone();
-
-    println!("Result: {:?}", res);
-    assert!(res.is_ok());
-}
-
-#[ignore = "requires confidential data"]
-#[test]
 fn steam_remove_authenticator() {
-    // load the session info from "public/steam_session.json"
-    let session_file = std::fs::File::open("public/steam_session.json").unwrap();
-    let session: super::steam_api::Session = serde_json::from_reader(session_file).unwrap();
-
-    let mut api_client = super::steam_api::SteamApiClient::new(Some(session));
-
-    let res = api_client.update_session();
-
-    println!("Result: {:?}", res);
-    assert!(res.is_ok());
-
-    // ask for revocation code
-    let mut revocation_code = String::new();
-    println!("Please enter your revocation code: ");
-    std::io::stdin().read_line(&mut revocation_code).unwrap();
-    let revocation_code = revocation_code.trim().to_string();
-
-    let res = api_client.remove_authenticator(revocation_code);
-
-    println!("Result: {:?}", res);
-    assert!(res.is_ok());
-}
-
-#[ignore = "requires confidential data"]
-#[test]
-fn steam_login_add_phone() {
     // load the session info from "public/steam_session.json"
     let session_file = std::fs::File::open("public/steam_session.json").unwrap();
     let session: super::steam_api::Session = serde_json::from_reader(session_file).unwrap();
@@ -149,68 +103,14 @@ fn steam_login_add_phone() {
     assert!(res.is_ok());
     assert!(res.unwrap());
 
-    // ask for phone number
-    let mut phone_number = String::new();
-    println!("Please enter your phone number: ");
-    std::io::stdin().read_line(&mut phone_number).unwrap();
-    let phone_number = phone_number.trim().to_string();
+    // ask for revocation code
+    let mut revocation_code = String::new();
+    println!("Please enter your revocation code: ");
+    std::io::stdin().read_line(&mut revocation_code).unwrap();
+    let revocation_code = revocation_code.trim().to_string();
 
-    // validate phone number
-    // let res = api_client.phone_validate(&phone_number);
-    // if let Err(error) = res {
-        // panic!("Error: {:?}", error);
-    // }
-    // let res = res.unwrap();
-    // if !res.is_valid {
-        // panic!("Phone number is not valid {:?}", res);
-    // }
+    let res = api_client.remove_authenticator(revocation_code);
 
-    loop {
-        let res = api_client.add_phone_number(phone_number.clone());
-
-        println!("Result: {:?}", res);
-
-        match res {
-            Ok(_) => {
-                break;
-            }
-            Err(error) => match error {
-                error::Error::SteamLoginError(error::SteamLoginError::NeedSMS) => {
-                    break;
-                }
-                error::Error::SteamLoginError(error::SteamLoginError::NeedEmail) => {
-                    println!("Please confirm the email in your mail box");
-                    let mut email_code = String::new();
-                    std::io::stdin().read_line(&mut email_code).unwrap();
-                }
-                _ => {
-                    panic!("Error: {:?}", error)
-                }
-            },
-        }
-    }
-
-    loop {
-        // ask for phone code
-        let mut phone_code = String::new();
-        println!("Please enter your phone code: ");
-        std::io::stdin().read_line(&mut phone_code).unwrap();
-        let phone_code = phone_code.trim().to_string();
-
-        let res = api_client.confirm_phone_number(phone_code);
-
-        match res {
-            Ok(_) => {
-                break;
-            }
-            Err(error) => match error {
-                error::Error::SteamLoginError(error::SteamLoginError::NeedSMS) => {
-                    println!("Please enter the correct phone code: ");
-                }
-                _ => {
-                    panic!("Error: {:?}", error)
-                }
-            },
-        }
-    }
+    println!("Result: {:?}", res);
+    assert!(res.is_ok());
 }

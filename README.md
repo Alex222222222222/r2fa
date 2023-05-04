@@ -46,9 +46,10 @@ This feature provided log support for the library.
 
 ## TODO
 
-- [ ] log feature
+- [x] log feature
 - [ ] steam guard
   - [x] steam login
+  - [ ] add phone number to steam
   - [ ] add steam guard method
   - [ ] remove steam guard method
   - [ ] confirmations
@@ -185,3 +186,147 @@ uri.to_qr_code("public/uri_qrcode_encode_test.png").unwrap();
 
 The encoded qrcode:
 ![encoded qrcode](public/uri_qrcode_encode_test.png)
+
+## Steam API
+
+### Phone Validate API
+
+Test whether a phone number is valid and is a voip.
+
+Host: `store.steampowered.com`
+
+Endpoint: `/phone/validate`
+
+Method: `POST`
+
+Content-Type: `application/x-www-form-urlencoded; charset=UTF-8`
+
+Request Body:
+
+- `sessionID` : session id
+- `phoneNumber`: phone number
+
+Response: `json`
+
+Response Sample:
+
+```json
+{
+    "success":true,
+    "number":"your phone number",
+    "is_valid":true,
+    "is_voip":false,
+    "is_fixed":false
+}
+```
+
+### Add Phone Number
+
+This is a multi process procedure.
+
+1. First you send you `phone number` to steam.
+2. Then it is likely that steam will ask for your `Email Verification`.
+3. You click the email verification link send to your mailbox.
+4. You send a request to steam says that you have clicked the link.
+5. Then steam will send a `sms code` to the phone number.
+6. You send a request to steam that contain the `sms code`.
+7. Done.
+
+However all this process have the same `host`, `endpoint`, `method`
+and `content type`.
+The only difference is the `request body`.
+
+Host: `store.steampowered.com`
+
+Endpoint: `/phone/add_ajaxop`
+
+Method: `POST`
+
+Content-Type: `application/x-www-form-urlencoded; charset=UTF-8`
+
+#### Send the phone number
+
+Request Body:
+
+- `op` : `get_phone_number`
+- `input` : your phone number
+- `sessionID` : your session id
+- `confirmed` : `1`
+- `checkfortos` : `1`
+- `bisediting` : `0`
+- `token` : `0`
+
+Response Sample:
+
+```json
+{
+    "success":true,
+    "showResend":false,
+    "state":"email_verification",
+    "errorText":"",
+    "token":"0",
+    "phoneNumber":"your phone number"
+}
+```
+
+The `state` is `email_verification` means you could go for email verification.
+The `state` is `get_sms_code` means you could go for check `sms code`.
+
+#### Email Verification
+
+Request Body:
+
+- `op` : `email_verification`
+- `input` : empty
+- `sessionID` : your session id
+- `confirmed` : `1`
+- `checkfortos` : `1`
+- `bisediting` : `0`
+- `token` : `0`
+
+Response Sample:
+
+```json
+{
+    "success":true,
+    "showResend":false,
+    "state":"get_sms_code",
+    "errorText":"",
+    "token":"0",
+    "inputSize":"20",
+    "maxLength":"5"
+}
+```
+
+The `state` is `email_verification` means you could go for email verification.
+The `state` is `get_sms_code` means you could go for check `sms code`.
+
+#### SMS Code Verification
+
+Request Body:
+
+- `op` : `get_sms_code`
+- `input` : sms code you receive
+- `sessionID` : your session id
+- `confirmed` : `1`
+- `checkfortos` : `1`
+- `bisediting` : `0`
+- `token` : `0`
+
+Response Sample:
+
+```json
+{
+    "success":true,
+    "showResend":false,
+    "state":"done",
+    "errorText":"",
+    "token":"0",
+    "vac_policy":0,
+    "tos_policy":2,
+    "showDone":true,
+    "maxLength":"5"
+}
+```
+
+The `state` is `done` means the process is done.

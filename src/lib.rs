@@ -43,6 +43,8 @@ pub enum KeyType {
     HOTP,
     #[default]
     TOTP,
+    #[cfg(feature = "steam")]
+    Steam,
 }
 
 impl std::fmt::Display for KeyType {
@@ -50,6 +52,8 @@ impl std::fmt::Display for KeyType {
         match self {
             KeyType::HOTP => write!(f, "hotp"),
             KeyType::TOTP => write!(f, "totp"),
+            #[cfg(feature = "steam")]
+            KeyType::Steam => write!(f, "steam"),
         }
     }
 }
@@ -124,12 +128,12 @@ pub trait Key {
     ///     ..Default::default()
     /// };
     ///
-    /// hotp_key.set_recovery_codes(&["test".to_string()]);
+    /// hotp_key.set_recovery_codes(vec!["test".to_string()]);
     ///
     /// assert_eq!(hotp_key.get_recovery_codes(), &["test".to_string()])
     ///
     /// ```
-    fn get_recovery_codes(&self) -> &[String];
+    fn get_recovery_codes(&self) -> Vec<String>;
 
     /// get the type of the key
     fn get_type(&self) -> KeyType;
@@ -167,12 +171,12 @@ pub trait Key {
     ///     ..Default::default()
     /// };
     ///
-    /// hotp_key.set_recovery_codes(&["test".to_string()]);
+    /// hotp_key.set_recovery_codes(vec!["test".to_string()]);
     ///
     /// assert_eq!(hotp_key.get_recovery_codes(), &["test".to_string()])
     ///
     /// ```
-    fn set_recovery_codes(&mut self, recovery_codes: &[String]);
+    fn set_recovery_codes(&mut self, recovery_codes: Vec<String>);
 }
 
 /// create a new key from the uri string
@@ -209,6 +213,8 @@ pub fn otpauth_from_uri(uri: &str) -> Result<Box<dyn Key>, Error> {
     match uri_struct.key_type {
         KeyType::HOTP => HOTPKey::from_uri_struct(&uri_struct),
         KeyType::TOTP => TOTPKey::from_uri_struct(&uri_struct),
+        #[cfg(feature = "steam")]
+        KeyType::Steam => steam::SteamKey::from_uri_struct(&uri_struct),
     }
 }
 
@@ -247,6 +253,8 @@ pub fn otpauth_from_uri_qrcode(path: &str) -> Result<Box<dyn Key>, Error> {
     match uri_struct.key_type {
         KeyType::HOTP => HOTPKey::from_uri_struct(&uri_struct),
         KeyType::TOTP => TOTPKey::from_uri_struct(&uri_struct),
+        #[cfg(feature = "steam")]
+        KeyType::Steam => steam::SteamKey::from_uri_struct(&uri_struct),
     }
 }
 

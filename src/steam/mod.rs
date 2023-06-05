@@ -1,12 +1,9 @@
-mod api_response;
-mod mobile_web_auth;
-mod steam_api;
+mod mafile;
+mod steam_key;
 mod token;
-mod user;
-mod utils;
 
-pub use steam_api::SteamApiClient;
-pub use user::UserLogin;
+pub use mafile::MaFile;
+pub use steam_key::SteamKey;
 
 #[cfg(test)]
 mod test;

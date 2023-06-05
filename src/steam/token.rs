@@ -8,7 +8,37 @@ impl TwoFactorSecret {
         Self([0u8; 20])
     }
 
-    #[allow(dead_code)] // TODO remove this
+    /// parse the self data to base32 token
+    pub fn to_base32(&self) -> String {
+        data_encoding::BASE32.encode(&self.0)
+    }
+
+    /// parse the self data type to base64 token
+    pub fn to_shared_secret(&self) -> String {
+        data_encoding::BASE64.encode(&self.0)
+    }
+
+    /// parse the base32 token to self data type
+    pub fn from_base32(secret: String) -> Result<Self, crate::error::Error> {
+        // ensure!(secret.len() != 0, "unable to parse empty shared secret");
+        if secret.is_empty() {
+            return Err(crate::error::Error::InvalidKey);
+        }
+        let res = data_encoding::BASE32.decode(secret.as_bytes());
+        if res.is_err() {
+            return Err(crate::error::Error::InvalidKey);
+        }
+        let res = res.unwrap();
+        let res: Result<[u8; 20], _> = res.try_into();
+        if res.is_err() {
+            return Err(crate::error::Error::InvalidKey);
+        }
+        let res = res.unwrap();
+
+        Ok(Self(res))
+    }
+
+    /// parse the base64 token to self data type
     pub fn parse_shared_secret(secret: String) -> Result<Self, crate::error::Error> {
         // ensure!(secret.len() != 0, "unable to parse empty shared secret");
         if secret.is_empty() {
@@ -28,8 +58,9 @@ impl TwoFactorSecret {
         Ok(Self(res))
     }
 
-    #[allow(dead_code)] // TODO remove this
     /// Generate a 5 character 2FA code to that can be used to log in to Steam.
+    ///
+    /// time is unix epoch in second
     pub fn generate_code(&self, time: u64) -> String {
         let steam_guard_code_translations: [u8; 26] = [
             50, 51, 52, 53, 54, 55, 56, 57, 66, 67, 68, 70, 71, 72, 74, 75, 77, 78, 80, 81, 82, 84,

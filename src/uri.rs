@@ -33,9 +33,21 @@ pub struct URI {
     /// Secret
     pub secret: String,
     /// algorithm
-    pub algorithm: HMACType,
+    ///
+    /// optional for all key types
+    ///
+    /// default SHA1 for HOTP, TOTP,
+    ///
+    /// this option will be ignored for key type steam
+    pub algorithm: Option<HMACType>,
     /// digits
-    pub digits: u8,
+    ///
+    /// optional for all key types
+    ///
+    /// default 6 for HOTP, TOTP,
+    ///
+    /// this option will be ignored for key type steam
+    pub digits: Option<u8>,
     /// counter
     ///
     /// The counter is only used for HOTP.
@@ -62,9 +74,9 @@ impl URI {
     ///
     /// assert_eq!(uri.key_type, KeyType::HOTP);
     /// assert_eq!(uri.issuer, Some("ACME Co".to_string()));
-    /// assert_eq!(uri.digits, 7);
+    /// assert_eq!(uri.digits, Some(7));
     /// assert_eq!(uri.counter, Some(7));
-    /// assert_eq!(uri.algorithm, HMACType::SHA256);
+    /// assert_eq!(uri.algorithm, Some(HMACType::SHA256));
     /// assert_eq!(uri.secret, "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ".to_string());
     /// ```
     pub fn new_from_uri(value: String) -> Self {
@@ -84,9 +96,9 @@ impl URI {
     ///
     /// assert_eq!(uri.key_type, KeyType::TOTP);
     /// assert_eq!(uri.issuer, Some("ACME Co".to_string()));
-    /// assert_eq!(uri.digits, 7);
+    /// assert_eq!(uri.digits, Some(7));
     /// assert_eq!(uri.counter, None);
-    /// assert_eq!(uri.algorithm, HMACType::SHA256);
+    /// assert_eq!(uri.algorithm, Some(HMACType::SHA256));
     /// assert_eq!(uri.secret, "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ".to_string());
     /// ```
     #[cfg(feature = "qrcoderead")]
@@ -242,43 +254,63 @@ impl From<URI> for DynamicImage {
 /// ```
 impl From<URI> for String {
     fn from(value: URI) -> Self {
-        let mut uri = String::new();
+        match value.key_type {
+            #[cfg(feature = "steam")]
+            KeyType::Steam => {
+                format!(
+                    "otpauth://totp/Steam:{}?secret={}&issuer=Steam",
+                    value.name, value.secret
+                )
+            }
+            _ => {
+                let mut uri = String::new();
 
-        uri.push_str("otpauth://");
-        uri.push_str(value.key_type.to_string().as_str());
-        uri.push('/');
-        let name = url::form_urlencoded::byte_serialize(value.name.as_bytes()).collect::<String>();
-        uri.push_str(&name);
+                uri.push_str("otpauth://");
+                uri.push_str(value.key_type.to_string().as_str());
+                uri.push('/');
+                let name =
+                    url::form_urlencoded::byte_serialize(value.name.as_bytes()).collect::<String>();
+                uri.push_str(&name);
 
-        let mut keys = vec![];
-        let secret = format!("secret={}", value.secret);
-        keys.push(secret);
-        let algorithm = format!(
-            "algorithm={}",
-            value.algorithm.to_string().to_ascii_uppercase()
-        );
-        keys.push(algorithm);
-        let digits = format!("digits={}", value.digits);
-        keys.push(digits);
-        if value.counter.is_some() {
-            let counter = format!("counter={}", value.counter.unwrap());
-            keys.push(counter);
+                let mut keys = vec![];
+                let secret = format!("secret={}", value.secret);
+                keys.push(secret);
+                let algorithm = if let Some(algorithm) = value.algorithm {
+                    algorithm
+                } else {
+                    HMACType::default()
+                };
+                let algorithm = format!("algorithm={}", algorithm.to_string().to_ascii_uppercase());
+                keys.push(algorithm);
+                let digits = if let Some(digits) = value.digits {
+                    digits
+                } else {
+                    6
+                };
+                let digits = format!("digits={}", digits);
+                keys.push(digits);
+                if value.counter.is_some() {
+                    let counter = format!("counter={}", value.counter.unwrap());
+                    keys.push(counter);
+                }
+                if value.period.is_some() {
+                    let period = format!("period={}", value.period.unwrap());
+                    keys.push(period);
+                }
+                if value.issuer.is_some() {
+                    let issuer =
+                        url::form_urlencoded::byte_serialize(value.issuer.unwrap().as_bytes())
+                            .collect::<String>();
+                    let issuer = format!("issuer={}", issuer);
+                    keys.push(issuer);
+                }
+
+                uri.push('?');
+                uri.push_str(keys.join("&").as_str());
+
+                uri
+            }
         }
-        if value.period.is_some() {
-            let period = format!("period={}", value.period.unwrap());
-            keys.push(period);
-        }
-        if value.issuer.is_some() {
-            let issuer = url::form_urlencoded::byte_serialize(value.issuer.unwrap().as_bytes())
-                .collect::<String>();
-            let issuer = format!("issuer={}", issuer);
-            keys.push(issuer);
-        }
-
-        uri.push('?');
-        uri.push_str(keys.join("&").as_str());
-
-        uri
     }
 }
 
@@ -300,6 +332,10 @@ impl From<&str> for URI {
         let name = key_type[1];
         let key_type = key_type[0];
         uri.key_type = KeyType::from(key_type);
+
+        if name.to_uppercase().starts_with("steam") {
+            uri.key_type = KeyType::Steam;
+        }
 
         let name = if name.get(0..1) == Some("?") {
             "".to_string()
@@ -344,11 +380,11 @@ impl From<&str> for URI {
 
             match key {
                 "secret" => uri.secret = value.to_string(),
-                "algorithm" => uri.algorithm = HMACType::from(value.to_string()),
+                "algorithm" => uri.algorithm = Some(HMACType::from(value.to_string())),
                 "digits" => {
                     let res = value.parse::<u8>();
                     if let Ok(res) = res {
-                        uri.digits = res;
+                        uri.digits = Some(res);
                     }
                 }
                 "period" => {

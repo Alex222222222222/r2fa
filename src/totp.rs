@@ -167,4 +167,8 @@ impl Key for TOTPKey {
     fn set_recovery_codes(&mut self, recovery_codes: Vec<String>) {
         self.recovery_codes = recovery_codes.to_vec();
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

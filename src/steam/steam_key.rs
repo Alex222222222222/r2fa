@@ -1,10 +1,43 @@
-use crate::{Key, OtpAuthKey};
+use crate::{Error, Key, OtpAuthKey};
 
 use super::{token::TwoFactorSecret, MaFile};
 
+/// the steam key struct
+///
+/// ```rust
+/// use libr2fa::SteamKey;
+/// use libr2fa::Key;
+/// use libr2fa::steam::MaFile;
+///
+/// let mafile = MaFile::from_file("./public/mafile_test.mafile");
+///
+/// assert!(mafile.is_ok());
+///
+/// let steam_key = SteamKey::from_mafile(mafile.unwrap());
+///
+/// assert!(steam_key.is_ok());
+///
+/// let mut steam_key = steam_key.unwrap();
+///
+/// let code = steam_key.get_code();
+///
+/// assert!(code.is_ok());
+///
+/// let code = code.unwrap();
+///
+/// println!("steam code: {}", code);
+/// ```
 pub struct SteamKey {
     pub token: TwoFactorSecret,
     pub mafile: MaFile,
+}
+
+impl SteamKey {
+    pub fn from_mafile(mafile: MaFile) -> Result<Self, Error> {
+        let token = TwoFactorSecret::parse_shared_secret(mafile.shared_secret.clone())?;
+
+        Ok(SteamKey { token, mafile })
+    }
 }
 
 impl Key for SteamKey {
@@ -43,6 +76,10 @@ impl Key for SteamKey {
             return;
         }
         self.mafile.revocation_code = recovery_codes[0].clone();
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

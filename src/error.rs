@@ -23,14 +23,22 @@ pub enum Error {
     #[cfg(feature = "steam")]
     ReqwestError(String, String),
     /// error in serde in steam module
+    ///
+    /// the first string is the error message
+    ///
+    /// the second string is the string tring to be parsed
+    ///
+    /// the third string is the serde error
     #[cfg(feature = "steam")]
     SteamSerdeError(String, String, String),
-    /// error in steam return result
-    #[cfg(feature = "steam")]
-    SteamError(String, String),
-    /// steam login error
-    #[cfg(feature = "steam")]
-    SteamLoginError(SteamLoginError),
+    /// io error
+    ///
+    /// the first string is the error message
+    ///
+    /// the second string is the path
+    ///
+    /// the third string is the io error
+    IOError(String, String, String),
 }
 
 impl std::fmt::Display for Error {
@@ -46,45 +54,7 @@ impl std::fmt::Display for Error {
             Error::SteamSerdeError(s1, s2, s3) => {
                 write!(f, "Steam serde error: {}, {}, {}", s1, s2, s3)
             }
-            #[cfg(feature = "steam")]
-            Error::SteamError(s1, s2) => write!(f, "Steam error: {}, {}", s1, s2),
-            #[cfg(feature = "steam")]
-            Error::SteamLoginError(s2) => write!(f, "Steam login error: {}", s2),
-        }
-    }
-}
-
-#[cfg(feature = "steam")]
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub enum SteamLoginError {
-    BadRSA(String),
-    BadCredentials,
-    NeedCaptcha { captcha_gid: String },
-    Need2FA,
-    NeedEmail,
-    NeedEmailConfirmation,
-    NeedSMS,
-    TooManyAttempts,
-    NetworkFailure(String),
-    OtherFailure(String),
-}
-
-#[cfg(feature = "steam")]
-impl std::fmt::Display for SteamLoginError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SteamLoginError::BadRSA(s) => write!(f, "Bad RSA: {}", s),
-            SteamLoginError::BadCredentials => write!(f, "Bad credentials"),
-            SteamLoginError::NeedCaptcha { captcha_gid } => {
-                write!(f, "Need captcha: {}", captcha_gid)
-            }
-            SteamLoginError::Need2FA => write!(f, "Need 2FA"),
-            SteamLoginError::NeedEmail => write!(f, "Need email"),
-            SteamLoginError::NeedSMS => write!(f, "Need SMS"),
-            SteamLoginError::NeedEmailConfirmation => write!(f, "Need email confirmation"),
-            SteamLoginError::TooManyAttempts => write!(f, "Too many attempts"),
-            SteamLoginError::NetworkFailure(s) => write!(f, "Network failure: {}", s),
-            SteamLoginError::OtherFailure(s) => write!(f, "Other failure: {}", s),
+            Error::IOError(s1, s2, s3) => write!(f, "IO error: {}, {}, {}", s1, s2, s3),
         }
     }
 }

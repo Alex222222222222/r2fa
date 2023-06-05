@@ -164,4 +164,8 @@ impl Key for HOTPKey {
     fn set_recovery_codes(&mut self, recovery_codes: Vec<String>) {
         self.recovery_codes = recovery_codes;
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

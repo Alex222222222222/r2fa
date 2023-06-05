@@ -1,3 +1,5 @@
+use std::any::Any;
+
 /// rust implementation for HTOP, TOTP and steam guard tow-factor-authentication
 ///
 /// usage:
@@ -30,6 +32,8 @@ pub use uri::URI;
 
 #[cfg(feature = "steam")]
 pub mod steam;
+#[cfg(feature = "steam")]
+pub use steam::SteamKey;
 
 #[cfg(test)]
 mod test;
@@ -43,6 +47,8 @@ pub enum KeyType {
     HOTP,
     #[default]
     TOTP,
+    #[cfg(feature = "steam")]
+    Steam,
 }
 
 impl std::fmt::Display for KeyType {
@@ -50,6 +56,8 @@ impl std::fmt::Display for KeyType {
         match self {
             KeyType::HOTP => write!(f, "hotp"),
             KeyType::TOTP => write!(f, "totp"),
+            #[cfg(feature = "steam")]
+            KeyType::Steam => write!(f, "steam"),
         }
     }
 }
@@ -87,6 +95,27 @@ impl From<String> for KeyType {
 /// let code = hotp_key.get_code().unwrap();
 /// ```
 pub trait Key {
+    /// use to downcast to original type
+    ///
+    /// ```rust
+    /// use libr2fa::HOTPKey;
+    /// use libr2fa::HMACType;
+    /// use libr2fa::Key;
+    ///
+    /// let hotp_key = HOTPKey {
+    ///     key: "MFSWS5LGNBUXKZLBO5TGQ33JO5SWC2DGNF2WCZLIMZUXKZLXMFUGM2LVNFQWK53IMZUXK2A=".to_string(),
+    ///     hmac_type: HMACType::SHA1,
+    ///     ..Default::default()
+    /// };
+    ///
+    /// let key: Box<dyn Key> = Box::new(hotp_key);
+    ///
+    /// let hotp_key = key.as_any().downcast_ref::<HOTPKey>();
+    ///
+    /// assert!(hotp_key.is_some());
+    /// ```
+    fn as_any(&self) -> &dyn Any;
+
     /// get_code returns the code for the key
     ///
     /// if it is HTOP key, it will increment the counter
@@ -124,12 +153,12 @@ pub trait Key {
     ///     ..Default::default()
     /// };
     ///
-    /// hotp_key.set_recovery_codes(&["test".to_string()]);
+    /// hotp_key.set_recovery_codes(vec!["test".to_string()]);
     ///
     /// assert_eq!(hotp_key.get_recovery_codes(), &["test".to_string()])
     ///
     /// ```
-    fn get_recovery_codes(&self) -> &[String];
+    fn get_recovery_codes(&self) -> Vec<String>;
 
     /// get the type of the key
     fn get_type(&self) -> KeyType;
@@ -167,12 +196,12 @@ pub trait Key {
     ///     ..Default::default()
     /// };
     ///
-    /// hotp_key.set_recovery_codes(&["test".to_string()]);
+    /// hotp_key.set_recovery_codes(vec!["test".to_string()]);
     ///
     /// assert_eq!(hotp_key.get_recovery_codes(), &["test".to_string()])
     ///
     /// ```
-    fn set_recovery_codes(&mut self, recovery_codes: &[String]);
+    fn set_recovery_codes(&mut self, recovery_codes: Vec<String>);
 }
 
 /// create a new key from the uri string
@@ -209,6 +238,8 @@ pub fn otpauth_from_uri(uri: &str) -> Result<Box<dyn Key>, Error> {
     match uri_struct.key_type {
         KeyType::HOTP => HOTPKey::from_uri_struct(&uri_struct),
         KeyType::TOTP => TOTPKey::from_uri_struct(&uri_struct),
+        #[cfg(feature = "steam")]
+        KeyType::Steam => steam::SteamKey::from_uri_struct(&uri_struct),
     }
 }
 
@@ -247,6 +278,8 @@ pub fn otpauth_from_uri_qrcode(path: &str) -> Result<Box<dyn Key>, Error> {
     match uri_struct.key_type {
         KeyType::HOTP => HOTPKey::from_uri_struct(&uri_struct),
         KeyType::TOTP => TOTPKey::from_uri_struct(&uri_struct),
+        #[cfg(feature = "steam")]
+        KeyType::Steam => steam::SteamKey::from_uri_struct(&uri_struct),
     }
 }
 

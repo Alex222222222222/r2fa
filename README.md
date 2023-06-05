@@ -48,7 +48,8 @@ This feature provided log support for the library.
 
 - [x] log feature
 - [ ] steam guard
-  - [x] steam login
+  - [x] generate steam guard code from mafile
+  - [ ] steam login
   - [ ] add phone number to steam
   - [ ] add steam guard method
   - [ ] remove steam guard method
@@ -186,6 +187,41 @@ uri.to_qr_code("public/uri_qrcode_encode_test.png").unwrap();
 
 The encoded qrcode:
 ![encoded qrcode](public/uri_qrcode_encode_test.png)
+
+### Steam Guard Code Generation
+
+You need to have a `mafile` first.
+
+On what is a mafile and how to get a mafile,
+follow [ASF 2FA](https://github.com/JustArchiNET/ArchiSteamFarm/wiki/Two-factor-authentication#user-content-creation).
+
+It will give you a `.maFile` at `config` folder.
+
+#### Get Steam Guard Code
+
+```rust
+use libr2fa::SteamKey;
+use libr2fa::Key;
+use libr2fa::steam::MaFile;
+
+let mafile = MaFile::from_file("./public/mafile_test.mafile");
+
+assert!(mafile.is_ok());
+
+let steam_key = SteamKey::from_mafile(mafile.unwrap());
+
+assert!(steam_key.is_ok());
+
+let mut steam_key = steam_key.unwrap();
+
+let code = steam_key.get_code();
+
+assert!(code.is_ok());
+
+let code = code.unwrap();
+
+println!("steam code: {}", code);
+```
 
 ## Steam API
 

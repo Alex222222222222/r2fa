@@ -77,8 +77,8 @@ impl OtpAuthKey for HOTPKey {
             name: self.name.clone(),
             secret: self.key.clone(),
             issuer: self.issuer.clone(),
-            algorithm: self.hmac_type,
-            digits: self.digits,
+            algorithm: Some(self.hmac_type),
+            digits: Some(self.digits),
             period: None,
             counter: Some(self.counter),
             key_type: crate::KeyType::TOTP,
@@ -91,14 +91,24 @@ impl OtpAuthKey for HOTPKey {
         } else {
             30
         };
+        let digits = if let Some(digits) = uri.digits {
+            digits
+        } else {
+            6
+        };
+        let algorithm = if let Some(algorithm) = uri.algorithm {
+            algorithm
+        } else {
+            HMACType::SHA1
+        };
 
         Ok(Box::from(HOTPKey {
             name: uri.name.clone(),
             key: uri.secret.clone(),
-            digits: uri.digits,
+            digits,
             counter,
             recovery_codes: Vec::default(),
-            hmac_type: uri.algorithm,
+            hmac_type: algorithm,
             issuer: uri.issuer.clone(),
         }))
     }
@@ -117,8 +127,8 @@ impl Key for HOTPKey {
         &self.name
     }
 
-    fn get_recovery_codes(&self) -> &[String] {
-        &self.recovery_codes
+    fn get_recovery_codes(&self) -> Vec<String> {
+        self.recovery_codes.clone()
     }
 
     fn get_code(&mut self) -> Result<String, error::Error> {
@@ -151,7 +161,11 @@ impl Key for HOTPKey {
         self.name = name.to_string();
     }
 
-    fn set_recovery_codes(&mut self, recovery_codes: &[String]) {
-        self.recovery_codes = recovery_codes.to_vec();
+    fn set_recovery_codes(&mut self, recovery_codes: Vec<String>) {
+        self.recovery_codes = recovery_codes;
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

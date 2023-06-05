@@ -307,3 +307,62 @@ Response Sample:
 
 The `state` is `email_verification` means you could go for email verification.
 The `state` is `get_sms_code` means you could go for check `sms code`.
+
+#### Email Verification
+
+Request Body:
+
+- `op` : `email_verification`
+- `input` : empty
+- `sessionID` : your session id
+- `confirmed` : `1`
+- `checkfortos` : `1`
+- `bisediting` : `0`
+- `token` : `0`
+
+Response Sample:
+
+```json
+{
+    "success":true,
+    "showResend":false,
+    "state":"get_sms_code",
+    "errorText":"",
+    "token":"0",
+    "inputSize":"20",
+    "maxLength":"5"
+}
+```
+
+The `state` is `email_verification` means you could go for email verification.
+The `state` is `get_sms_code` means you could go for check `sms code`.
+
+#### SMS Code Verification
+
+Request Body:
+
+- `op` : `get_sms_code`
+- `input` : sms code you receive
+- `sessionID` : your session id
+- `confirmed` : `1`
+- `checkfortos` : `1`
+- `bisediting` : `0`
+- `token` : `0`
+
+Response Sample:
+
+```json
+{
+    "success":true,
+    "showResend":false,
+    "state":"done",
+    "errorText":"",
+    "token":"0",
+    "vac_policy":0,
+    "tos_policy":2,
+    "showDone":true,
+    "maxLength":"5"
+}
+```
+
+The `state` is `done` means the process is done.

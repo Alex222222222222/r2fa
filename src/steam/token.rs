@@ -1,3 +1,4 @@
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Clone)]
@@ -70,10 +71,16 @@ impl TwoFactorSecret {
         // this effectively makes it so that it creates a new code every 30 seconds.
         let time_bytes: [u8; 8] = build_time_bytes(time / 30u64);
         // let hashed_data = hmacsha1::hmac_sha1(self.0.expose_secret(), &time_bytes);
-        let hashed_data = ring::hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY;
-        let signer = ring::hmac::Key::new(hashed_data, &self.0);
-        let hashed_data = ring::hmac::sign(&signer, &time_bytes);
-        let hashed_data = hashed_data.as_ref();
+        // let hashed_data = ring::hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY;
+        // let signer = ring::hmac::Key::new(hashed_data, &self.0);
+        // let hashed_data = ring::hmac::sign(&signer, &time_bytes);
+        // let hashed_data = hashed_data.as_ref();
+
+        let mut mac = Hmac::<sha1::Sha1>::new_from_slice(&self.0).unwrap();
+        mac.update(&time_bytes);
+        let result = mac.finalize();
+        let hashed_data: &[u8] = &result.into_bytes();
+
         let mut code_array: [u8; 5] = [0; 5];
         let b = (hashed_data[19] & 0xF) as usize;
         let mut code_point: i32 = ((hashed_data[b] & 0x7F) as i32) << 24

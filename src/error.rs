@@ -19,9 +19,6 @@ pub enum Error {
     InvalidURI(String),
     /// invalid file path
     InvalidPath(String),
-    /// reqwest error, with when the error happen and a description of the error
-    #[cfg(feature = "steam")]
-    ReqwestError(String, String),
     /// error in serde in steam module
     ///
     /// the first string is the error message
@@ -48,8 +45,6 @@ impl std::fmt::Display for Error {
             Error::InvalidDigits => write!(f, "Invalid digits"),
             Error::InvalidURI(s) => write!(f, "Invalid URI: {}", s),
             Error::InvalidPath(s) => write!(f, "Invalid path: {}", s),
-            #[cfg(feature = "steam")]
-            Error::ReqwestError(s1, s2) => write!(f, "Reqwest error: {}, {}", s1, s2),
             #[cfg(feature = "steam")]
             Error::SteamSerdeError(s1, s2, s3) => {
                 write!(f, "Steam serde error: {}, {}, {}", s1, s2, s3)

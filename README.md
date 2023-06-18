@@ -2,9 +2,6 @@
 
 Rust implementation for HTOP, TOTP and steam guard tow-factor-authentication.
 
-Use [`ring`](https://crates.io/crates/ring) `0.16.20`,
-may be incompatible with other version of `ring`.
-
 ## Features
 
 - HOTP, TOTP

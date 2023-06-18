@@ -1,5 +1,6 @@
 use std::{fmt::Display, rc::Rc};
 
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 
 use crate::error;
@@ -42,21 +43,47 @@ impl HMACType {
         }
     }
 
-    fn get_algorithm(&self) -> ring::hmac::Algorithm {
-        match self {
-            HMACType::SHA1 => ring::hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY,
-            HMACType::SHA256 => ring::hmac::HMAC_SHA256,
-            HMACType::SHA512 => ring::hmac::HMAC_SHA512,
-        }
-    }
-
     /// get_hash returns the hash of the key and the string
     pub fn get_hash(&self, key: &[u8], s: &[u8]) -> Result<Rc<[u8]>, error::Error> {
-        let algorithm = self.get_algorithm();
-        let signer = ring::hmac::Key::new(algorithm, key);
-        let hmac = ring::hmac::sign(&signer, s);
-        let block = hmac.as_ref();
+        let result = match self {
+            HMACType::SHA1 => {
+                let mac = Hmac::<sha1::Sha1>::new_from_slice(key);
+                if let Err(_) = mac {
+                    return Err(error::Error::InvalidKey);
+                }
+                let mut mac = mac.unwrap();
 
-        Ok(Rc::from(block))
+                mac.update(s);
+                let result = mac.finalize();
+                let result: &[u8] = &result.into_bytes();
+                Rc::from(result)
+            },
+            HMACType::SHA256 => {
+                let mac = Hmac::<sha2::Sha256>::new_from_slice(key);
+                if let Err(_) = mac {
+                    return Err(error::Error::InvalidKey);
+                }
+                let mut mac = mac.unwrap();
+
+                mac.update(s);
+                let result = mac.finalize();
+                let result: &[u8] = &result.into_bytes();
+                Rc::from(result)
+            },
+            HMACType::SHA512 => {
+                let mac = Hmac::<sha2::Sha512>::new_from_slice(key);
+                if let Err(_) = mac {
+                    return Err(error::Error::InvalidKey);
+                }
+                let mut mac = mac.unwrap();
+
+                mac.update(s);
+                let result = mac.finalize();
+                let result: &[u8] = &result.into_bytes();
+                Rc::from(result)
+            },
+        };
+
+        Ok(result)
     }
 }
